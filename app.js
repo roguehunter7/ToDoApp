@@ -35,6 +35,8 @@
     const progressArc = $('progressArc');
     const progressPct = $('progressPct');
     const toastContainer = $('toastContainer');
+    const inputModes = $('inputModes');
+    const chips = $('chips');
     const confirmDialog = $('confirmDialog');
     const confirmMsg = $('confirmMsg');
     const confirmCancel = $('confirmCancel');
@@ -42,6 +44,7 @@
 
 
     let isSignup = false;
+    let inputMode = 'todo';
     let currentUser = null;
     let isAdmin = false;
     let confirmResolve = null;
@@ -142,6 +145,13 @@
     taskDate.value = selectedDate;
     updateDateHero();
     renderWeekStrip(new Set());
+
+    // Chips: hide after first use
+    if (localStorage.getItem('pulsetask_used')) {
+      chips.classList.add('hidden');
+    }
+    // Activity mode: hide date picker by default
+    taskDate.style.display = 'block';
 
     // === Theme ===
     const themeToggle = $('themeToggle');
@@ -403,9 +413,8 @@
     // === Dashboard logic ===
     function classify(text, scheduledAt) {
       const t = text.trim();
-      const m = t.match(/^(did:|x:|\/done)\s*(.*)/i);
-      if (m && m[2]) {
-        return { text: m[2] || m[0], entry_type: 'ACTIVITY_LOG', status: 'COMPLETED', completed_at: new Date().toISOString() };
+      if (inputMode === 'done') {
+        return { text: t, entry_type: 'ACTIVITY_LOG', status: 'COMPLETED', completed_at: new Date().toISOString() };
       }
       return { text: t, entry_type: 'TODO', status: 'PENDING', scheduled_at: scheduledAt || null, completed_at: null };
     }
@@ -563,12 +572,42 @@
       }
       taskInput.value = '';
       taskInput.focus();
+      // Hide chips after first real use
+      localStorage.setItem('pulsetask_used', '1');
+      chips.classList.add('hidden');
       toast(item.entry_type === 'TODO' ? 'Task added' : 'Activity logged', 'added');
       loadItems();
     }
 
     addBtn.addEventListener('click', addItem);
     taskInput.addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
+
+    // === Input mode switching ===
+    inputModes.addEventListener('click', e => {
+      const btn = e.target.closest('.input-mode');
+      if (!btn || btn.classList.contains('active')) return;
+      inputModes.querySelectorAll('.input-mode').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      inputMode = btn.dataset.mode;
+      // Hide date picker in activity mode, show in task mode
+      taskDate.style.display = inputMode === 'done' ? 'none' : 'block';
+      // Update placeholder
+      taskInput.placeholder = inputMode === 'todo'
+        ? 'What do you need to do?'
+        : 'What did you do?';
+      taskInput.focus();
+    });
+
+    // === Suggestion chips ===
+    chips.addEventListener('click', e => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      taskInput.value = chip.dataset.text;
+      taskInput.focus();
+      // First usage: hide chips permanently
+      localStorage.setItem('pulsetask_used', '1');
+      chips.classList.add('hidden');
+    });
 
     document.addEventListener('keydown', e => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
