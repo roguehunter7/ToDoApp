@@ -61,6 +61,10 @@
             <div class="dropdown-role" id="dropRole" style="display:none">Admin</div>
           </div>
           <div class="dropdown-divider"></div>
+          <button class="dropdown-item" id="exportBtn">
+            <span>📥</span> Export Data
+          </button>
+          <div class="dropdown-divider"></div>
           <button class="dropdown-item" id="signOutBtn">
             <span>🚪</span> Sign Out
           </button>
@@ -120,10 +124,20 @@
       </div>
       <div class="input-row">
         <input type="date" id="taskDate" class="date-input" title="Schedule for date">
+        <select id="recurrenceSelect" class="date-input" title="Repeat" style="max-width:100px;padding:14px 8px;font-size:12px">
+          <option value="">No repeat</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
         <button class="btn btn-primary" id="addBtn">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           Add
         </button>
+      </div>
+      <div class="input-extras">
+        <button class="btn-text" id="tagToggle" style="font-size:12px;color:var(--text-dim);background:none;border:none;cursor:pointer;padding:4px 0">+ tags</button>
+        <input type="text" id="tagsField" placeholder="work, personal, errands" style="display:none;width:100%;padding:8px 10px;background:var(--surface-2);border:var(--border-base);border-radius:var(--radius-sm);color:var(--text);font-size:12px;outline:none;margin-top:4px">
       </div>
       <div class="chips" id="chips">
         <button class="chip" data-text="Buy groceries">🛒 Buy groceries</button>
@@ -133,6 +147,7 @@
     </div>
 
     <div class="dashboard">
+      <div id="tagFilterBar" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:12px;grid-column:1/-1"></div>
       <div class="column">
         <div class="column-header">
           <span class="icon">✅</span> <span id="doneColTitle">What I Did Today</span>

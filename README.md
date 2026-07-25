@@ -21,6 +21,11 @@ Todo + activity tracker with auth, calendar scheduling, and AI summaries. Vanill
 - Progress ring with completion %, stats badges
 - Real-time sync across open tabs
 - **AI Summaries** — daily / weekly / monthly reports via DeepSeek v4 Flash (Edge Function)
+- **Tags** — organize tasks with tags, click to filter
+- **Recurring tasks** — daily / weekly / monthly repeats (auto-created on complete)
+- **Inline edit** — double-click a pending task to edit
+- **Undo complete** — 5-second undo bar after completing a task
+- **Export** — download all data as JSON from the user menu
 - `⌘K` focus input, `Enter` add, quick-add chips (hide after first use)
 
 ## Database

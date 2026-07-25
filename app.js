@@ -50,6 +50,7 @@
     let confirmResolve = null;
     let realtimeChannel = null;
     let loadSeq = 0;
+    let activeTagFilter = null;
 
     // Calendar state
     const today = () => {
@@ -148,6 +149,15 @@
     taskDate.value = selectedDate;
     updateDateHero();
     renderWeekStrip(new Set());
+
+    // Tag toggle
+    const tagToggle = $('tagToggle');
+    const tagsField = $('tagsField');
+    const recurrenceSelect = $('recurrenceSelect');
+    tagToggle.addEventListener('click', () => {
+      tagsField.style.display = tagsField.style.display === 'none' ? 'block' : 'none';
+      if (tagsField.style.display === 'block') tagsField.focus();
+    });
 
     // Chips: hide after first use
     if (localStorage.getItem('pulsetask_used')) {
@@ -346,6 +356,21 @@
 
     document.addEventListener('click', () => userDropdown.classList.remove('open'));
 
+    // Export data
+    $('exportBtn').addEventListener('click', async () => {
+      userDropdown.classList.remove('open');
+      if (!currentUser) return;
+      const { data, error } = await supabase.from('items').select('*').eq('user_id', currentUser.id);
+      if (error) { toast(`Export failed: ${error.message}`, 'deleted'); return; }
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `pulsetask-export-${today()}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast('Data exported', 'done');
+    });
+
     // Sign out
     signOutBtn.addEventListener('click', async () => {
       userDropdown.classList.remove('open');
@@ -453,11 +478,32 @@
     }
 
     async function completeItem(id) {
+      // Fetch the item first to check for recurrence
+      const { data: item } = await supabase
+        .from('items')
+        .select('*')
+        .eq('id', id).eq('user_id', currentUser.id)
+        .maybeSingle();
+
       const { error } = await supabase
         .from('items')
         .update({ status: 'COMPLETED', completed_at: new Date().toISOString() })
         .eq('id', id).eq('user_id', currentUser.id);
       if (error) { console.error(error); toast(`Complete failed: ${error.message}`, 'deleted'); return; }
+
+      // Create next occurrence for recurring tasks
+      if (item?.recurrence) {
+        const nextDate = new Date();
+        if (item.recurrence === 'daily') nextDate.setDate(nextDate.getDate() + 1);
+        else if (item.recurrence === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
+        else if (item.recurrence === 'monthly') nextDate.setMonth(nextDate.getMonth() + 1);
+        await supabase.from('items').insert({
+          user_id: currentUser.id, text: item.text, entry_type: item.entry_type || 'TODO',
+          status: 'PENDING', tags: item.tags || [], recurrence: item.recurrence,
+          recurrence_origin_id: item.id, scheduled_at: nextDate.toISOString(),
+        });
+      }
+
       toast('Task completed');
       loadItems();
     }
@@ -483,10 +529,53 @@
         div.innerHTML = `
           <input type="checkbox" class="item-check">
           <span class="item-text">${esc(item.text)}</span>
-          <span class="item-meta">${item.scheduled_at ? new Date(item.scheduled_at).toLocaleDateString() : ''}</span>
+          <span class="item-tags">${(item.tags||[]).map(t => `<span class="tag-pill" data-tag="${esc(t)}">${esc(t)}</span>`).join('')}</span>
+          <span class="item-meta">${item.scheduled_at ? new Date(item.scheduled_at).toLocaleDateString() : ''}${item.recurrence ? ' 🔄' : ''}</span>
           <button class="btn-icon danger" data-action="delete" title="Delete">✕</button>
         `;
-        div.querySelector('.item-check').addEventListener('change', () => completeItem(item.id));
+        // Undo-able complete
+        div.querySelector('.item-check').addEventListener('change', function () {
+          if (!this.checked) return;
+          this.checked = false;
+          const bar = document.createElement('div');
+          bar.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;box-shadow:var(--shadow-lg);animation:toast-in .45s cubic-bezier(.34,1.56,.64,1)';
+          bar.innerHTML = `<span>✅ Task done</span><button id="undoBtn" style="margin-left:auto;background:none;border:none;color:var(--accent);font-weight:700;font-size:13px;cursor:pointer;padding:4px 8px">Undo</button>`;
+          toastContainer.appendChild(bar);
+          let done = false;
+          const t = setTimeout(async () => {
+            if (done) return;
+            done = true; bar.remove();
+            await completeItem(item.id);
+          }, 5000);
+          bar.querySelector('#undoBtn').onclick = () => {
+            if (done) return;
+            done = true; clearTimeout(t); bar.remove();
+          };
+        });
+        // Inline edit on double-click
+        const textSpan = div.querySelector('.item-text');
+        textSpan.addEventListener('dblclick', () => {
+          textSpan.contentEditable = 'true'; textSpan.focus();
+          const r = document.createRange(); r.selectNodeContents(textSpan);
+          const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        });
+        textSpan.addEventListener('blur', async () => {
+          textSpan.contentEditable = 'false';
+          const nt = textSpan.textContent.trim();
+          if (nt && nt !== item.text) {
+            const { error: e } = await supabase.from('items').update({ text: nt }).eq('id', item.id).eq('user_id', currentUser.id);
+            if (e) { toast(`Edit failed: ${e.message}`, 'deleted'); textSpan.textContent = item.text; }
+            else item.text = nt;
+          } else textSpan.textContent = item.text;
+        });
+        textSpan.addEventListener('keydown', e => {
+          if (e.key === 'Enter') { e.preventDefault(); textSpan.blur(); }
+          if (e.key === 'Escape') { textSpan.textContent = item.text; textSpan.contentEditable = 'false'; }
+        });
+        // Tag filter click
+        div.querySelectorAll('.tag-pill').forEach(p => {
+          p.addEventListener('click', e => { e.stopPropagation(); filterByTag(p.dataset.tag); });
+        });
         div.querySelector('[data-action="delete"]').addEventListener('click', e => {
           e.stopPropagation();
           deleteItem(item.id);
@@ -495,9 +584,13 @@
         div.innerHTML = `
           <span class="item-marker">✓</span>
           <span class="item-text">${esc(item.text)}</span>
+          <span class="item-tags">${(item.tags||[]).map(t => `<span class="tag-pill" data-tag="${esc(t)}">${esc(t)}</span>`).join('')}</span>
           <span class="item-meta">${fmtRel(item.completed_at)}</span>
           <button class="btn-icon danger" data-action="delete" title="Delete">✕</button>
         `;
+        div.querySelectorAll('.tag-pill').forEach(p => {
+          p.addEventListener('click', e => { e.stopPropagation(); filterByTag(p.dataset.tag); });
+        });
         div.querySelector('[data-action="delete"]').addEventListener('click', e => {
           e.stopPropagation();
           deleteItem(item.id);
@@ -521,25 +614,31 @@
         .eq('user_id', currentUser.id)
         .order('created_at', { ascending: true });
 
-      if (error) { console.error(error); toast('Failed to load items', 'deleted'); return; }
+      if (error) { console.error(error); toast(`Failed to load: ${error.message}`, 'deleted'); return; }
       if (seq !== loadSeq) return; // stale response
 
       const items = data || [];
+      allItems.length = 0; allItems.push(...items);
+
+      // Apply tag filter
+      const filtered = activeTagFilter
+        ? items.filter(i => (i.tags || []).includes(activeTagFilter))
+        : items;
 
       // Build set of local dates that have tasks (for week strip dots)
       const taskDates = new Set();
-      items.forEach(i => {
+      filtered.forEach(i => {
         if (i.status === 'COMPLETED' && i.completed_at) taskDates.add(localDateFromISO(i.completed_at));
         if (i.entry_type === 'TODO' && i.scheduled_at) taskDates.add(localDateFromISO(i.scheduled_at));
       });
 
-      const done = items.filter(i =>
+      const done = filtered.filter(i =>
         i.status === 'COMPLETED' && i.completed_at &&
         +new Date(i.completed_at) >= selStartMs && +new Date(i.completed_at) <= selEndMs
       );
-      const pending = items.filter(i =>
+      const pending = filtered.filter(i =>
         i.entry_type === 'TODO' && i.status === 'PENDING' &&
-        (i.scheduled_at == null || (+new Date(i.scheduled_at) >= selStartMs && +new Date(i.scheduled_at) <= selEndMs))
+        ((isToday && i.scheduled_at == null) || (+new Date(i.scheduled_at) >= selStartMs && +new Date(i.scheduled_at) <= selEndMs))
       );
 
       done.sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
@@ -586,6 +685,30 @@
 
       updateDateHero();
       renderWeekStrip(taskDates);
+      renderTagFilterBar();
+    }
+
+    // === Tag filter ===
+    const tagFilterBar = $('tagFilterBar');
+    const allItems = [];
+
+    function filterByTag(tag) {
+      activeTagFilter = activeTagFilter === tag ? null : tag;
+      renderTagFilterBar();
+      loadItems();
+    }
+
+    function renderTagFilterBar() {
+      const tags = new Set();
+      allItems.forEach(i => (i.tags || []).forEach(t => tags.add(t)));
+      if (tags.size === 0) { tagFilterBar.style.display = 'none'; return; }
+      tagFilterBar.style.display = 'flex';
+      tagFilterBar.innerHTML = Array.from(tags).map(t =>
+        `<button class="tag-filter${activeTagFilter === t ? ' active' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`
+      ).join('');
+      tagFilterBar.querySelectorAll('.tag-filter').forEach(b =>
+        b.addEventListener('click', () => filterByTag(b.dataset.tag))
+      );
     }
 
     async function addItem() {
@@ -599,13 +722,18 @@
           ? new Date(taskDate.value + 'T00:00:00').toISOString()
           : null;
         const item = classify(raw, scheduledAt);
-        const { error } = await supabase.from('items').insert({ ...item, user_id: currentUser.id });
+        const tags = tagsField.value.split(',').map(t => t.trim()).filter(Boolean);
+        const recurrence = recurrenceSelect.value || null;
+        const { error } = await supabase.from('items').insert({ ...item, user_id: currentUser.id, tags, recurrence });
         if (error) {
           console.error(error);
           toast(`Error saving: ${error.message}`, 'deleted');
           return;
         }
         taskInput.value = '';
+        tagsField.value = '';
+        recurrenceSelect.value = '';
+        tagsField.style.display = 'none';
         taskInput.focus();
         localStorage.setItem('pulsetask_used', '1');
         chips.classList.add('hidden');
