@@ -325,12 +325,10 @@
         text-transform: uppercase; color: var(--text-muted);
         border-bottom: var(--border-base); margin-bottom: 12px;
       }
-      .column-header .icon { font-size: 14px; }
       .column-header .count {
         margin-left: auto; font-size: 12px; font-weight: 500; font-family: var(--font-mono);
         color: var(--text-muted);
       }
-      .column-header .icon { font-size: 16px; }
 
       /* Items */
       .item-list { display: flex; flex-direction: column; gap: 6px; }
@@ -424,7 +422,7 @@
         .user-email { display: none; }
         .input-hint { display: none; }
         .stats { gap: 6px; margin-bottom: 14px; }
-        .stat { font-size: 12px; padding: 5px 10px; }
+        .stat { font-size: 10px; padding: 5px 10px; }
         .progress-ring { font-size: 11px; gap: 4px; }
         .week-strip { gap: 0; margin-bottom: 12px; }
         .week-label { display: none; }
