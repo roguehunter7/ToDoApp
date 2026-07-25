@@ -192,7 +192,7 @@
 
     // === PWA ===
     if ('serviceWorker' in navigator) {
-      // L9: relative path works regardless of deployment subpath
+      // relative path works regardless of deployment subpath
       navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {});
     }
 
@@ -215,7 +215,7 @@
       return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
-    // M1: Map raw errors to user-safe messages so internals aren't leaked
+    // Map raw errors to user-safe messages so internals aren't leaked
     const SAFE_ERRORS = {
       'Failed to load': 'Could not load data. Check your connection.',
       'Error saving': 'Could not save. Please try again.',
@@ -273,7 +273,7 @@
     confirmOk.addEventListener('click', () => {
       if (confirmResolve) confirmResolve(true);
       confirmDialog.close();
-      confirmResolve = null; // L16: close first, then nullify
+      confirmResolve = null; // close first, then nullify
       if (lastFocused) lastFocused.focus();
     });
     confirmDialog.addEventListener('close', () => {
@@ -385,7 +385,7 @@
     $('exportBtn').addEventListener('click', async () => {
       userDropdown.classList.remove('open');
       if (!currentUser) return;
-    // L1: Explicit columns instead of select('*')
+    // Explicit columns instead of select('*')
       const { data, error } = await supabase.from('items').select('id,user_id,text,entry_type,status,scheduled_at,completed_at,tags,recurrence,recurrence_origin_id,created_at').eq('user_id', currentUser.id);
       if (error) { toast(safeError(error.message || 'Export failed'), 'deleted'); return; }
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -403,7 +403,7 @@
       await supabase.auth.signOut();
     });
 
-    // Delete account — L4: no RPC fallback (would bypass edge function auth)
+    // Delete account — no RPC fallback (would bypass edge function auth)
     const ACCT_DEL_TIMEOUT = 10000;
     deleteAccountBtn.addEventListener('click', async () => {
       userDropdown.classList.remove('open');
@@ -450,8 +450,8 @@
       }
     });
 
-    // H2: Admin realtime — always scope to user regardless of admin flag for defense-in-depth
-    // M2: skip refresh while a tag filter is active to avoid flashing the unfiltered list
+    // Admin realtime — always scope to user regardless of admin flag for defense-in-depth
+    // skip refresh while a tag filter is active to avoid flashing the unfiltered list
     function subscribeRealtime(user) {
       if (realtimeChannel) supabase.removeChannel(realtimeChannel);
       realtimeChannel = supabase
@@ -494,7 +494,7 @@
       return { text: t, entry_type: 'TODO', status: 'PENDING', scheduled_at: scheduledAt || null, completed_at: null };
     }
 
-    // H3: await loadItems after each mutation so UI never contradicts the toast
+    // await loadItems after each mutation so UI never contradicts the toast
     async function deleteItem(id) {
       const ok = await showConfirm('Delete this item?');
       if (!ok) return;
@@ -529,12 +529,12 @@
           .eq('status', 'PENDING')
           .maybeSingle();
         if (!existing) {
-          // M3: normalize to midnight so the date-range filter matches
+          // normalize to midnight so the date-range filter matches
           const nextDate = new Date(today() + 'T00:00:00');
           if (item.recurrence === 'daily') nextDate.setDate(nextDate.getDate() + 1);
           else if (item.recurrence === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
           else if (item.recurrence === 'monthly') {
-            // H6: clamp to month-end (fixes Jan 31 → Feb 28 instead of Mar 3)
+            // clamp to month-end (fixes Jan 31 → Feb 28 instead of Mar 3)
             const origDay = nextDate.getDate();
             nextDate.setMonth(nextDate.getMonth() + 1);
             if (nextDate.getDate() !== origDay) nextDate.setDate(0);
@@ -584,7 +584,7 @@
           bar.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;box-shadow:var(--shadow-lg);animation:toast-in .45s cubic-bezier(.34,1.56,.64,1);pointer-events:auto';
           bar.innerHTML = `<span>✅ Task done</span><button class="undo-btn" style="margin-left:auto;background:none;border:none;color:var(--accent);font-weight:700;font-size:13px;cursor:pointer;padding:4px 8px">Undo</button>`;
           toastContainer.appendChild(bar);
-          // H5: persist undo in sessionStorage so it survives navigation
+          // persist undo in sessionStorage so it survives navigation
           pendingUndos.set(item.id, true);
           sessionStorage.setItem('pulsetask_undo', item.id);
           sessionStorage.setItem('pulsetask_undo_exp', String(Date.now() + 5000));
@@ -593,7 +593,7 @@
             sessionStorage.removeItem('pulsetask_undo');
             sessionStorage.removeItem('pulsetask_undo_exp');
             bar.remove();
-            try { await completeItem(item.id); } catch (e) { /* M11: re-add bar on failure */
+            try { await completeItem(item.id); } catch (e) { /* re-add bar on failure */
               bar.querySelector('span').textContent = '⚠️ Completion failed — try again';
               bar.querySelector('.undo-btn').textContent = 'Retry';
               bar.querySelector('.undo-btn').onclick = () => { bar.remove(); completeItem(item.id); };
@@ -608,7 +608,7 @@
             clearTimeout(t); bar.remove();
           };
         });
-        // Inline edit: double-click or Enter on focused item (M7: keyboard accessible)
+        // Inline edit: double-click or Enter on focused item (keyboard accessible)
         const textSpan = div.querySelector('.item-text');
         textSpan.tabIndex = 0;
         textSpan.addEventListener('dblclick', startEdit);
@@ -631,7 +631,7 @@
         });
         textSpan.addEventListener('keydown', e => {
           if (e.key === 'Enter') { e.preventDefault(); textSpan.blur(); }
-          // C3: stopPropagation prevents Escape from resetting calendar
+          // stopPropagation prevents Escape from resetting calendar
           if (e.key === 'Escape') { e.stopPropagation(); textSpan.textContent = item.text; textSpan.contentEditable = 'false'; }
         });
         // Tag filter click
@@ -755,7 +755,7 @@
     const tagFilterBar = $('tagFilterBar');
     const allItems = [];
 
-    // L15: no redundant renderTagFilterBar here — loadItems calls it
+    // no redundant renderTagFilterBar here — loadItems calls it
     function filterByTag(tag) {
       activeTagFilter = activeTagFilter === tag ? null : tag;
       loadItems();
@@ -780,7 +780,7 @@
       if (!raw) return;
       if (raw.length > 1000) { toast('Task too long (max 1000 chars)', 'deleted'); return; }
 
-      // M10: disable add button to prevent double-add
+      // disable add button to prevent double-add
       addBtn.disabled = true;
       try {
         const scheduledAt = taskDate.value
@@ -857,7 +857,7 @@
         e.preventDefault();
         taskInput.focus();
       }
-      // M13: guard against dialog Escape bubbling after native close
+      // guard against dialog Escape bubbling after native close
       if (e.key === 'Escape' && currentUser && !confirmDialog.open && !reportDialog.open && !e.target.closest('dialog')) {
         selectedDate = today();
         taskDate.value = selectedDate;
@@ -881,7 +881,7 @@
       reportDialog.showModal();
       loadReportHistory();
     }
-    // M8: track focus origin so we can return focus after dialog closes
+    // track focus origin so we can return focus after dialog closes
     let lastFocused = null;
     reportBtn.addEventListener('click', () => { lastFocused = reportBtn; openReport(); });
     reportBtn.addEventListener('keydown', e => {
@@ -894,7 +894,7 @@
       btn.addEventListener('click', () => generateReport(btn.dataset.period));
     });
 
-    // M12: guard concurrent report requests
+    // guard concurrent report requests
     let reportLoading_ = false;
     async function generateReport(periodType) {
       if (reportLoading_) return;
@@ -981,7 +981,7 @@
 
       if (error) { console.error(error); toast('Failed to load report history', 'deleted'); return; }
 
-      // Remove old entries, keep header (M4: after error check so we don't wipe on failure)
+      // Remove old entries, keep header (after error check so we don't wipe on failure)
       reportHistory.querySelectorAll('.report-card, .report-empty').forEach(e => e.remove());
       if (!data?.length) {
         const empty = document.createElement('div');

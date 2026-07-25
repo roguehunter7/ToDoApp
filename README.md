@@ -76,5 +76,4 @@ To run your own instance: create a Supabase project, create the tables, set up R
 
 ## Bug fixes
 
-See [BUGS.md](./BUGS.md) for the full audit. 43 of 48 identified bugs fixed across
-security, logic, accessibility, PWA, and code quality.
+43 of 48 identified bugs fixed across security, logic, accessibility, PWA, and code quality.

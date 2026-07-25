@@ -32,7 +32,7 @@
       <div class="auth-logo">PulseTask</div>
       <p class="auth-sub" id="authSub">Sign in to continue</p>
 
-      <div class="auth-error" id="authError" role="alert"><!-- L23: alert role --></div>
+      <div class="auth-error" id="authError" role="alert"></div>
 
       <form id="authForm" novalidate>
         <div class="auth-field">
@@ -53,11 +53,11 @@
     </div>
   </div>
 
-  <main id="app" class="app" style="display:none"><!-- L20: main landmark -->
+  <main id="app" class="app" style="display:none">
     <div class="topbar">
       <div class="topbar-left">
         <span class="topbar-logo">PulseTask</span>
-        <button class="theme-toggle" id="themeToggle" title="Toggle theme">☀️</button>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle theme">☀️</button>
       </div>
       <div class="topbar-right">
         <button class="user-btn" id="userBtn">
@@ -147,7 +147,7 @@
       </div>
       <div class="input-extras">
         <button class="btn-text" id="tagToggle" style="font-size:12px;color:var(--text-dim);background:none;border:none;cursor:pointer;padding:4px 0">+ tags</button>
-        <input type="text" id="tagsField" placeholder="work, personal, errands" aria-label="Tags (comma-separated)" style="display:none;width:100%;padding:8px 10px;background:var(--surface-2);border:var(--border-base);border-radius:var(--radius-sm);color:var(--text);font-size:12px;outline:none;margin-top:4px">
+        <input type="text" id="tagsField" placeholder="work, personal, errands" aria-label="Tags (comma-separated)" style="display:none;width:100%;padding:8px 10px;background:var(--surface-2);border:var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:12px;outline:none;margin-top:4px">
       </div>
       <div class="chips" id="chips">
         <button class="chip" data-text="Buy groceries"><span aria-hidden="true">🛒</span> Buy groceries</button>
@@ -175,7 +175,7 @@
     </div>
   </main>
 
-  <div id="loadingScreen" role="progressbar" aria-label="Loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#141410;z-index:999">
+  <div id="loadingScreen" role="progressbar" aria-label="Loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--surface-0);z-index:999">
     <div class="spinner"></div>
   </div>
 
@@ -204,9 +204,9 @@
     <div id="reportResult" style="display:none">
       <div id="reportSummary" style="font-size:14px;line-height:1.6;padding:16px;background:var(--surface-1);border-radius:var(--radius-sm);margin-bottom:12px"></div>
       <div id="reportBullets" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px"></div>
-      <div id="reportStats" style="font-size:12px;color:var(--text-muted);padding:8px 0;border-top:var(--border-base)"></div>
+      <div id="reportStats" style="font-size:12px;color:var(--text-muted);padding:8px 0;border-top:var(--border)"></div>
     </div>
-    <div id="reportHistory" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:var(--border-base)">
+    <div id="reportHistory" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding-top:12px;border-top:var(--border)">
       <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:4px">Previously generated:</div>
     </div>
   </dialog>

@@ -1,9 +1,9 @@
-// L12: bump this when deploying changes users should get immediately
+// bump this when deploying changes users should get immediately
 const CACHE = 'pulsetask-v7';
 
 // Derive base path dynamically so it works under any deployment path
 const base = self.location.pathname.replace(/\/[^/]*$/, '/');
-const basePlain = base.replace(/\/$/, ''); // L8: no-trailing-slash variant
+const basePlain = base.replace(/\/$/, ''); // no-trailing-slash variant
 
 const ASSETS = [
   base,
@@ -17,7 +17,7 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS).catch(err => console.warn('SW cache failed for some assets', err)))); // M6: log instead of silent
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS).catch(err => console.warn('SW cache failed for some assets', err)))); // log instead of silent
   self.skipWaiting();
 });
 
