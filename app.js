@@ -621,3 +621,137 @@
         loadItems();
       }
     });
+
+    // === Reports / Summaries ===
+    const reportBtn = $('reportBtn');
+    const reportDialog = $('reportDialog');
+    const reportClose = $('reportClose');
+    const reportLoading = $('reportLoading');
+    const reportResult = $('reportResult');
+    const reportSummary = $('reportSummary');
+    const reportBullets = $('reportBullets');
+    const reportStats = $('reportStats');
+    const reportHistory = $('reportHistory');
+
+    reportBtn.addEventListener('click', () => {
+      reportDialog.showModal();
+      loadReportHistory();
+    });
+    reportClose.addEventListener('click', () => reportDialog.close());
+
+    document.querySelectorAll('[data-period]').forEach(btn => {
+      btn.addEventListener('click', () => generateReport(btn.dataset.period));
+    });
+
+    async function generateReport(periodType) {
+      reportResult.style.display = 'none';
+      reportLoading.style.display = 'block';
+
+      const now = new Date();
+      let start, end;
+      if (periodType === 'daily') {
+        start = today();
+        end = today();
+      } else if (periodType === 'weekly') {
+        const d = new Date();
+        d.setDate(d.getDate() - d.getDay() + 1);
+        start = d.toISOString().slice(0,10);
+        end = today();
+      } else {
+        start = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+        end = today();
+      }
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('No session');
+
+        const res = await fetch(
+          `https://rqhrsildsoxeadchozui.supabase.co/functions/v1/generate-summary`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ period_type: periodType, period_start: start, period_end: end }),
+          }
+        );
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to generate summary');
+        }
+
+        const data = await res.json();
+        displayReport(data);
+        loadReportHistory();
+      } catch (err) {
+        reportSummary.textContent = `Error: ${err.message}`;
+        reportResult.style.display = 'block';
+      }
+      reportLoading.style.display = 'none';
+    }
+
+    function displayReport(data) {
+      reportSummary.innerHTML = esc(data.summary || 'No summary generated.');
+
+      reportBullets.innerHTML = '';
+      if (data.bullet_points?.length) {
+        data.bullet_points.forEach(b => {
+          const el = document.createElement('div');
+          el.style.cssText = 'display:flex;gap:8px;font-size:13px;color:var(--text-muted);line-height:1.4';
+          el.innerHTML = `<span style="color:var(--accent)">▸</span> ${esc(b)}`;
+          reportBullets.appendChild(el);
+        });
+      }
+
+      const s = data.stats || {};
+      reportStats.textContent =
+        `✅ ${s.total_completed || 0} done · ` +
+        `${s.todos_done || 0} tasks · ` +
+        `${s.activities_logged || 0} activities`;
+      reportResult.style.display = 'block';
+    }
+
+    async function loadReportHistory() {
+      const { data, error } = await supabase
+        .from('reports')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      // Remove old entries, keep header
+      reportHistory.querySelectorAll('.report-card').forEach(e => e.remove());
+
+      if (error || !data?.length) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'font-size:12px;color:var(--text-dim);padding:8px 0';
+        empty.textContent = 'No summaries generated yet. Tap a button above to create one.';
+        reportHistory.appendChild(empty);
+        return;
+      }
+
+      data.forEach(r => {
+        const card = document.createElement('div');
+        card.className = 'report-card';
+        card.style.cssText = 'padding:10px 12px;background:var(--surface-1);border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition);font-size:13px';
+        card.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:600">${capitalize(r.period_type)}</span>
+            <span style="font-size:11px;color:var(--text-dim)">${r.period_start} – ${r.period_end}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(r.summary)}</div>
+        `;
+        card.addEventListener('click', () => {
+          displayReport({
+            summary: r.summary,
+            bullet_points: r.bullet_points,
+            stats: r.stats,
+          });
+        });
+        reportHistory.appendChild(card);
+      });
+    }
+
+    function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
