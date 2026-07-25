@@ -556,7 +556,7 @@
         display: flex; gap: 6px; flex-wrap: wrap;
         margin-top: 4px; min-height: 0;
         transition: opacity .3s ease, max-height .4s ease;
-        overflow: clip; max-height: 68px; padding-bottom: 4px;
+        overflow: hidden; overflow: clip; max-height: 68px; padding-bottom: 4px;
       }
       .chips.hidden {
         opacity: 0; max-height: 0; margin-top: 0; padding-bottom: 0; pointer-events: none;
