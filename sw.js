@@ -1,5 +1,5 @@
-const CACHE = 'pulsetask-v2';
-const ASSETS = ['/ToDoApp/', '/ToDoApp/index.html', '/ToDoApp/manifest.json'];
+const CACHE = 'pulsetask-v3';
+const ASSETS = ['/ToDoApp/', '/ToDoApp/index.html', '/ToDoApp/style.css', '/ToDoApp/app.js', '/ToDoApp/manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
