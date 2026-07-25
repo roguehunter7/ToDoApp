@@ -74,7 +74,7 @@
       input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px var(--surface-2) inset; -webkit-text-fill-color: var(--text); }
 
       dialog {
-        background: var(--surface-2); color: var(--text); border: var(--border);
+        margin: auto; background: var(--surface-2); color: var(--text); border: var(--border);
         border-radius: var(--radius); padding: 24px; max-width: 380px; width: 90vw;
         backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
         box-shadow: var(--shadow-lg);
