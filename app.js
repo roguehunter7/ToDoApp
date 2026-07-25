@@ -124,6 +124,8 @@
 
     function navigateWeek(dir) {
       weekOffset += dir;
+      selectedDate = localDateStr(weekStart(weekOffset));
+      taskDate.value = selectedDate;
       loadItems();
     }
 
@@ -385,7 +387,7 @@
     // === Supabase auth listener ===
     supabase.auth.getSession().then(({ data: { session } }) => {
       currentUser = session?.user ?? null;
-      handleAuthChange(currentUser);
+      return handleAuthChange(currentUser);
     }).catch(err => { console.error('Auth init failed:', err); setLoading(false); });
 
     supabase.auth.onAuthStateChange((event, session) => {
@@ -428,6 +430,7 @@
         .select('email')
         .eq('email', user.email)
         .maybeSingle();
+      if (error) console.error('checkAdmin:', error);
       setAdminUI(!!data);
     }
 
@@ -509,8 +512,8 @@
 
       const selStart = new Date(selectedDate + 'T00:00:00');
       const selEnd = new Date(selectedDate + 'T23:59:59.999');
-      const selStartIso = selStart.toISOString();
-      const selEndIso = selEnd.toISOString();
+      const selStartMs = +selStart;
+      const selEndMs = +selEnd;
 
       const { data, error } = await supabase
         .from('items')
@@ -518,7 +521,7 @@
         .eq('user_id', currentUser.id)
         .order('created_at', { ascending: true });
 
-      if (error) { console.error(error); return; }
+      if (error) { console.error(error); toast('Failed to load items', 'deleted'); return; }
       if (seq !== loadSeq) return; // stale response
 
       const items = data || [];
@@ -531,15 +534,19 @@
       });
 
       const done = items.filter(i =>
-        i.status === 'COMPLETED' && i.completed_at && i.completed_at >= selStartIso && i.completed_at <= selEndIso
+        i.status === 'COMPLETED' && i.completed_at &&
+        +new Date(i.completed_at) >= selStartMs && +new Date(i.completed_at) <= selEndMs
       );
       const pending = items.filter(i =>
         i.entry_type === 'TODO' && i.status === 'PENDING' &&
-        (i.scheduled_at == null || (i.scheduled_at >= selStartIso && i.scheduled_at <= selEndIso))
+        (i.scheduled_at == null || (+new Date(i.scheduled_at) >= selStartMs && +new Date(i.scheduled_at) <= selEndMs))
       );
 
       done.sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
-      pending.sort((a, b) => (a.scheduled_at || '') > (b.scheduled_at || '') ? 1 : -1);
+      pending.sort((a, b) =>
+        (a.scheduled_at ? +new Date(a.scheduled_at) : Infinity) -
+        (b.scheduled_at ? +new Date(b.scheduled_at) : Infinity)
+      );
 
       // Update column titles
       const isToday = selectedDate === today();
@@ -767,7 +774,8 @@
       // Remove old entries, keep header
       reportHistory.querySelectorAll('.report-card, .report-empty').forEach(e => e.remove());
 
-      if (error || !data?.length) {
+      if (error) { console.error(error); toast('Failed to load report history', 'deleted'); return; }
+      if (!data?.length) {
         const empty = document.createElement('div');
         empty.className = 'report-empty';
         empty.style.cssText = 'font-size:12px;color:var(--text-dim);padding:8px 0';
