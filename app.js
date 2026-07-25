@@ -161,7 +161,7 @@
     });
 
     // Chips: hide after first use
-    if (localStorage.getItem('pulsetask_used')) {
+    if (localStorage.getItem('daymark_used')) {
       chips.classList.add('hidden');
     }
     // Activity mode: hide date picker by default
@@ -391,7 +391,7 @@
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `pulsetask-export-${today()}.json`;
+      a.download = `daymark-export-${today()}.json`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       toast('Data exported', 'done');
@@ -586,12 +586,12 @@
           toastContainer.appendChild(bar);
           // persist undo in sessionStorage so it survives navigation
           pendingUndos.set(item.id, true);
-          sessionStorage.setItem('pulsetask_undo', item.id);
-          sessionStorage.setItem('pulsetask_undo_exp', String(Date.now() + 5000));
+          sessionStorage.setItem('daymark_undo', item.id);
+          sessionStorage.setItem('daymark_undo_exp', String(Date.now() + 5000));
           const t = setTimeout(async () => {
             pendingUndos.delete(item.id);
-            sessionStorage.removeItem('pulsetask_undo');
-            sessionStorage.removeItem('pulsetask_undo_exp');
+            sessionStorage.removeItem('daymark_undo');
+            sessionStorage.removeItem('daymark_undo_exp');
             bar.remove();
             try { await completeItem(item.id); } catch (e) { /* re-add bar on failure */
               bar.querySelector('span').textContent = '⚠️ Completion failed — try again';
@@ -603,8 +603,8 @@
           bar.querySelector('.undo-btn').onclick = () => {
             if (!pendingUndos.has(item.id)) return;
             pendingUndos.delete(item.id);
-            sessionStorage.removeItem('pulsetask_undo');
-            sessionStorage.removeItem('pulsetask_undo_exp');
+            sessionStorage.removeItem('daymark_undo');
+            sessionStorage.removeItem('daymark_undo_exp');
             clearTimeout(t); bar.remove();
           };
         });
@@ -805,7 +805,7 @@
         recurrenceSelect.value = '';
         tagsField.style.display = 'none';
         taskInput.focus();
-        localStorage.setItem('pulsetask_used', '1');
+        localStorage.setItem('daymark_used', '1');
         chips.classList.add('hidden');
         toast(item.entry_type === 'TODO' ? 'Task added' : 'Activity logged', 'added');
         await loadItems();
@@ -848,7 +848,7 @@
       taskInput.value = chip.dataset.text;
       taskInput.focus();
       // First usage: hide chips permanently
-      localStorage.setItem('pulsetask_used', '1');
+      localStorage.setItem('daymark_used', '1');
       chips.classList.add('hidden');
     });
 

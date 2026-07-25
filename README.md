@@ -1,4 +1,4 @@
-# PulseTask
+# Daymark
 
 Todo + activity tracker with auth, calendar scheduling, and AI summaries. Vanilla JS, zero build step.
 

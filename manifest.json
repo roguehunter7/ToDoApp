@@ -1,6 +1,6 @@
 {
-  "name": "PulseTask",
-  "short_name": "PulseTask",
+  "name": "Daymark",
+  "short_name": "Daymark",
   "start_url": "/ToDoApp/",
   "scope": "/ToDoApp/",
   "display": "standalone",

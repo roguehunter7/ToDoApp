@@ -1,5 +1,5 @@
 // bump this when deploying changes users should get immediately
-const CACHE = 'pulsetask-v7';
+const CACHE = 'daymark-v7';
 
 // Derive base path dynamically so it works under any deployment path
 const base = self.location.pathname.replace(/\/[^/]*$/, '/');
