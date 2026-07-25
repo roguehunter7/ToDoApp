@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PulseTask</title>
-  <meta name="theme-color" content="#0a0a0f">
+  <meta name="theme-color" content="#141410">
   <meta name="description" content="Minimal todo app with calendar scheduling">
   <link rel="manifest" href="/ToDoApp/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,19 +25,19 @@
     @layer theme {
       :root {
         color-scheme: dark;
-        --surface-0: #0a0a0f;
-        --surface-1: #111118;
-        --surface-2: #181825;
-        --surface-3: #1e1e30;
-        --border: #2a2a40;
-        --border-hover: #3a3a55;
-        --text: #e4e4ed;
-        --text-muted: #7c7c94;
-        --text-dim: #55556b;
-        --accent: #34d399;
-        --accent-glow: rgba(52, 211, 153, .15);
-        --cyan: #22d3ee;
-        --cyan-glow: rgba(34, 211, 238, .12);
+        --surface-0: #141410;
+        --surface-1: #1a1a16;
+        --surface-2: #22221c;
+        --surface-3: #2a2a22;
+        --border: #333328;
+        --border-hover: #4a4a3a;
+        --text: #ededeb;
+        --text-muted: #949488;
+        --text-dim: #636358;
+        --accent: #e8b44f;
+        --accent-glow: rgba(232, 180, 79, .14);
+        --cyan: #c9a84c;
+        --cyan-glow: rgba(201, 168, 76, .1);
         --red: #f87171;
         --red-glow: rgba(248, 113, 113, .12);
         --radius: 12px;
@@ -49,19 +49,19 @@
 
       [data-theme="light"] {
         color-scheme: light;
-        --surface-0: #f0f0f3;
+        --surface-0: #faf9f5;
         --surface-1: #ffffff;
-        --surface-2: #f5f5f8;
-        --surface-3: #ebebf0;
-        --border: #d4d4dc;
-        --border-hover: #b0b0bc;
-        --text: #1a1a2e;
-        --text-muted: #5c5c72;
-        --text-dim: #8e8ea6;
-        --accent: #059669;
-        --accent-glow: rgba(5, 150, 105, .12);
-        --cyan: #0891b2;
-        --cyan-glow: rgba(8, 145, 178, .1);
+        --surface-2: #f5f4ef;
+        --surface-3: #edebe4;
+        --border: #e0ded6;
+        --border-hover: #c4c1b6;
+        --text: #1e1e1a;
+        --text-muted: #6b6b60;
+        --text-dim: #9a998c;
+        --accent: #c8870b;
+        --accent-glow: rgba(200, 135, 11, .1);
+        --cyan: #a07008;
+        --cyan-glow: rgba(160, 112, 8, .08);
         --red: #dc2626;
         --red-glow: rgba(220, 38, 38, .1);
       }
@@ -396,6 +396,20 @@
       }
       @keyframes spin { to { transform: rotate(360deg); } }
 
+      /* === Date hero === */
+      .date-hero {
+        display: flex; flex-direction: column; align-items: center;
+        margin-bottom: 12px; gap: 2px;
+      }
+      .date-hero-day {
+        font-size: 13px; font-weight: 600; color: var(--accent);
+        text-transform: uppercase; letter-spacing: .08em;
+      }
+      .date-hero-date {
+        font-size: 24px; font-weight: 800; color: var(--text);
+        letter-spacing: -.02em; line-height: 1.1;
+      }
+
       /* === Week strip === */
       .week-strip {
         display: flex; align-items: center; gap: 2px;
@@ -530,6 +544,10 @@
     </div>
 
     <!-- Week strip -->
+    <div class="date-hero">
+      <span class="date-hero-day" id="heroDay">Saturday</span>
+      <span class="date-hero-date" id="heroDate">July 25, 2026</span>
+    </div>
     <div class="week-strip">
       <button class="week-nav" id="weekPrev" title="Previous week">‹</button>
       <span class="week-label" id="weekLabel">Jul 21 – Jul 27, 2026</span>
@@ -653,6 +671,15 @@
     const weekNext = $('weekNext');
     const doneColTitle = $('doneColTitle');
     const pendingColTitle = $('pendingColTitle');
+    const heroDay = $('heroDay');
+    const heroDate = $('heroDate');
+
+    function updateDateHero() {
+      const d = new Date(selectedDate + 'T00:00:00');
+      const isToday = selectedDate === today();
+      heroDay.textContent = isToday ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'long' });
+      heroDate.textContent = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    }
 
     function fmtDateLabel(d) {
       return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -730,7 +757,7 @@
     function setTheme(t) {
       html.dataset.theme = t;
       themeToggle.textContent = t === 'dark' ? '☀️' : '🌙';
-      document.querySelector('meta[name="theme-color"]').content = t === 'dark' ? '#0a0a0f' : '#f0f0f3';
+      document.querySelector('meta[name="theme-color"]').content = t === 'dark' ? '#141410' : '#faf9f5';
     }
 
     const saved = localStorage.getItem('theme');
@@ -1117,6 +1144,7 @@
         progressPct.textContent = '0%';
       }
 
+      updateDateHero();
       renderWeekStrip(taskDates);
     }
 
