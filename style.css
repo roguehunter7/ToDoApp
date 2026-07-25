@@ -267,6 +267,10 @@
         color: var(--text-dim); margin-left: auto; cursor: pointer;
       }
       .progress-ring svg { transform: rotate(-90deg); }
+      .report-cta {
+        font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+        color: var(--accent); margin-left: 2px;
+      }
 
       /* === Input === */
       .input-area { display: flex; flex-direction: column; gap: 6px; margin-bottom: 24px; }
@@ -424,6 +428,7 @@
         .stats { gap: 6px; margin-bottom: 14px; }
         .stat { font-size: 10px; padding: 5px 10px; }
         .progress-ring { font-size: 11px; gap: 4px; }
+        .report-cta { display: none; }
         .week-strip { gap: 0; margin-bottom: 12px; }
         .week-label { display: none; }
         .day-pill { min-width: 34px; padding: 5px 0; font-size: 9px; }
