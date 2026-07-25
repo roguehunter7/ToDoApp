@@ -8,7 +8,7 @@
   <meta name="description" content="Minimal todo app with calendar scheduling">
   <link rel="manifest" href="/ToDoApp/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/@supabase/supabase-js@2" crossorigin="anonymous"></script>
   <script type="module" src="app.js"></script>
@@ -82,8 +82,8 @@
           <circle id="progressArc" cx="14" cy="14" r="11" fill="none"
             stroke="url(#prog-grad)" stroke-width="3" stroke-linecap="round"
             stroke-dasharray="69.1" stroke-dashoffset="69.1"/>
-          <defs><linearGradient id="prog-grad" x1="0" y1="0" x2="1" y2="1">
-            <stop stop-color="var(--accent)"/><stop offset="1" stop-color="var(--cyan)"/>
+          <defs><linearGradient id="prog-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop stop-color="var(--accent)"/><stop offset="1" stop-color="var(--pulse)"/>
           </linearGradient></defs>
         </svg>
         <span id="progressPct">0%</span>

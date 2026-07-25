@@ -738,8 +738,8 @@
         card.style.cssText = 'padding:10px 12px;background:var(--surface-1);border-radius:var(--radius-sm);cursor:pointer;transition:var(--transition);font-size:13px';
         card.innerHTML = `
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-weight:600">${capitalize(r.period_type)}</span>
-            <span style="font-size:11px;color:var(--text-dim)">${r.period_start} – ${r.period_end}</span>
+            <span style="font-weight:600">${esc(capitalize(r.period_type))}</span>
+            <span style="font-size:11px;color:var(--text-dim)">${esc(r.period_start)} – ${esc(r.period_end)}</span>
           </div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(r.summary)}</div>
         `;
