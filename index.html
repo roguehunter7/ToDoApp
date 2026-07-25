@@ -364,6 +364,57 @@
         animation: spin .6s linear infinite;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* === Week strip === */
+      .week-strip {
+        display: flex; align-items: center; gap: 2px;
+        margin-bottom: 16px; user-select: none;
+      }
+      .week-nav {
+        background: none; border: none; color: var(--text-dim);
+        font-size: 16px; padding: 6px 10px; cursor: pointer;
+        border-radius: var(--radius-sm); transition: var(--transition);
+        flex-shrink: 0;
+      }
+      .week-nav:hover { color: var(--text); background: var(--surface-2); }
+      .week-label {
+        font-size: 12px; font-weight: 600; color: var(--text-muted);
+        padding: 0 8px; white-space: nowrap; flex-shrink: 0;
+      }
+      .week-days {
+        display: flex; gap: 2px; flex: 1; justify-content: center;
+      }
+      .day-pill {
+        display: flex; flex-direction: column; align-items: center;
+        gap: 1px; padding: 7px 0; min-width: 42px;
+        background: transparent; border: 1px solid transparent;
+        border-radius: var(--radius-sm); color: var(--text-muted);
+        font-size: 10px; font-weight: 500; cursor: pointer;
+        transition: var(--transition); position: relative;
+      }
+      .day-pill .day-num {
+        font-size: 14px; font-weight: 600; line-height: 1;
+      }
+      .day-pill:hover { background: var(--surface-2); border-color: var(--border); }
+      .day-pill.active { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
+      .day-pill.today:not(.active) { color: var(--cyan); }
+      .day-pill.today:not(.active) .day-num { font-weight: 700; }
+      .day-dot {
+        width: 4px; height: 4px; border-radius: 50%;
+        background: var(--border-hover); margin-top: 1px;
+        transition: var(--transition);
+      }
+      .day-pill.active .day-dot { background: var(--accent); }
+      .day-pill.today:not(.active) .day-dot { background: var(--cyan); }
+
+      .date-input {
+        padding: 14px 12px; background: var(--surface-1);
+        border: 1px solid var(--border); border-radius: var(--radius);
+        color: var(--text); font-size: 13px; cursor: pointer;
+        outline: none; transition: var(--transition); max-width: 140px;
+        color-scheme: dark;
+      }
+      .date-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
     }
   </style>
 </head>
@@ -447,6 +498,14 @@
       </div>
     </div>
 
+    <!-- Week strip -->
+    <div class="week-strip">
+      <button class="week-nav" id="weekPrev" title="Previous week">‹</button>
+      <span class="week-label" id="weekLabel">Jul 21 – Jul 27, 2026</span>
+      <div class="week-days" id="weekDays"></div>
+      <button class="week-nav" id="weekNext" title="Next week">›</button>
+    </div>
+
     <!-- Input -->
     <div class="input-area">
       <div class="input-wrap">
@@ -457,6 +516,7 @@
           <kbd>⌘K</kbd> <kbd>↵</kbd>
         </div>
       </div>
+      <input type="date" id="taskDate" class="date-input" title="Schedule for date">
       <button class="btn btn-primary" id="addBtn">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
         Add
@@ -467,14 +527,14 @@
     <div class="dashboard">
       <div class="column">
         <div class="column-header">
-          <span class="icon">✅</span> What I Did Today
+          <span class="icon">✅</span> <span id="doneColTitle">What I Did Today</span>
           <span class="count" id="doneCount">0</span>
         </div>
         <div class="item-list" id="completedList"></div>
       </div>
       <div class="column">
         <div class="column-header">
-          <span class="icon">📋</span> Left To Do
+          <span class="icon">📋</span> <span id="pendingColTitle">Scheduled</span>
           <span class="count" id="pendingCount">0</span>
         </div>
         <div class="item-list" id="pendingList"></div>
@@ -549,6 +609,88 @@
     let isAdmin = false;
     let confirmResolve = null;
     let realtimeChannel = null;
+
+    // Calendar state
+    const today = () => new Date().toISOString().slice(0, 10);
+    let selectedDate = today();
+    let weekOffset = 0;
+
+    const taskDate = $('taskDate');
+    const weekDays = $('weekDays');
+    const weekLabel = $('weekLabel');
+    const weekPrev = $('weekPrev');
+    const weekNext = $('weekNext');
+    const doneColTitle = $('doneColTitle');
+    const pendingColTitle = $('pendingColTitle');
+
+    function fmtDateLabel(d) {
+      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    }
+
+    function fmtDateFull(d) {
+      return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    }
+
+    function weekStart(offset) {
+      const d = new Date();
+      d.setDate(d.getDate() - d.getDay() + 1 + offset * 7); // Monday start
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    function renderWeekStrip(taskDates) {
+      const start = weekStart(weekOffset);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+
+      weekLabel.textContent = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+
+      weekDays.innerHTML = '';
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(start);
+        d.setDate(d.getDate() + i);
+        const ds = d.toISOString().slice(0, 10);
+        const hasTasks = taskDates && taskDates.has(ds);
+        const isToday = ds === today();
+        const isActive = ds === selectedDate;
+
+        const pill = document.createElement('button');
+        pill.className = 'day-pill' +
+          (isActive ? ' active' : '') +
+          (isToday ? ' today' : '');
+        pill.innerHTML = `<span class="day-num">${d.getDate()}</span>${d.toLocaleDateString('en-US', { weekday: 'short' })}` +
+          (hasTasks ? '<span class="day-dot"></span>' : '<span class="day-dot" style="visibility:hidden"></span>');
+        pill.addEventListener('click', () => {
+          selectedDate = ds;
+          taskDate.value = ds;
+          loadItems();
+        });
+        weekDays.appendChild(pill);
+      }
+    }
+
+    function navigateWeek(dir) {
+      weekOffset += dir;
+      loadItems();
+    }
+
+    weekPrev.addEventListener('click', () => navigateWeek(-1));
+    weekNext.addEventListener('click', () => navigateWeek(1));
+    taskDate.addEventListener('change', () => {
+      if (taskDate.value) {
+        selectedDate = taskDate.value;
+        // Align week offset to include selected date
+        const sel = new Date(selectedDate + 'T00:00:00');
+        const ws = weekStart(weekOffset);
+        const we = new Date(ws); we.setDate(we.getDate() + 6);
+        if (sel < ws || sel > we) {
+          const days = Math.floor((sel - weekStart(0)) / (1000 * 60 * 60 * 24));
+          weekOffset = Math.floor(days / 7);
+        }
+        loadItems();
+      }
+    });
+    taskDate.value = selectedDate;
 
     // === Helpers ===
     function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
@@ -774,13 +916,13 @@
     }
 
     // === Dashboard logic ===
-    function classify(text) {
+    function classify(text, scheduledAt) {
       const t = text.trim();
       const m = t.match(/^(did:|x:|\/done)\s*(.*)/i);
       if (m && m[2]) {
         return { text: m[2] || m[0], entry_type: 'ACTIVITY_LOG', status: 'COMPLETED', completed_at: new Date().toISOString() };
       }
-      return { text: t, entry_type: 'TODO', status: 'PENDING', scheduled_at: null, completed_at: null };
+      return { text: t, entry_type: 'TODO', status: 'PENDING', scheduled_at: scheduledAt || null, completed_at: null };
     }
 
     async function deleteItem(id) {
@@ -847,9 +989,10 @@
     async function loadItems() {
       if (!currentUser) return;
 
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayStr = todayStart.toISOString();
+      const selStart = new Date(selectedDate + 'T00:00:00');
+      const selEnd = new Date(selectedDate + 'T23:59:59.999Z');
+      const selStartIso = selStart.toISOString();
+      const selEndIso = selEnd.toISOString();
 
       const { data, error } = await supabase
         .from('items')
@@ -859,21 +1002,41 @@
       if (error) { console.error(error); return; }
 
       const items = data || [];
-      const done = items.filter(i => i.status === 'COMPLETED' && i.completed_at && i.completed_at >= todayStr);
-      const pending = items.filter(i => i.entry_type === 'TODO' && i.status === 'PENDING');
+
+      // Build set of dates that have tasks (for week strip dots)
+      const taskDates = new Set();
+      items.forEach(i => {
+        if (i.completed_at) taskDates.add(i.completed_at.slice(0, 10));
+        if (i.scheduled_at) taskDates.add(i.scheduled_at.slice(0, 10));
+        if (i.created_at) taskDates.add(i.created_at.slice(0, 10));
+      });
+
+      const done = items.filter(i =>
+        i.status === 'COMPLETED' && i.completed_at && i.completed_at >= selStartIso && i.completed_at <= selEndIso
+      );
+      const pending = items.filter(i =>
+        i.entry_type === 'TODO' && i.status === 'PENDING' &&
+        (i.scheduled_at == null || (i.scheduled_at >= selStartIso && i.scheduled_at <= selEndIso))
+      );
 
       done.sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
+      pending.sort((a, b) => (a.scheduled_at || '') > (b.scheduled_at || '') ? 1 : -1);
+
+      // Update column titles
+      const isToday = selectedDate === today();
+      doneColTitle.textContent = isToday ? 'What I Did Today' : `Done on ${fmtDateFull(selStart)}`;
+      pendingColTitle.textContent = isToday ? 'Scheduled' : `Scheduled for ${fmtDateFull(selStart)}`;
 
       completedList.innerHTML = '';
       if (done.length === 0) {
-        completedList.appendChild(createEmpty(DONE_EMPTY, 'Nothing logged yet today', 'Activities appear here after you log them'));
+        completedList.appendChild(createEmpty(DONE_EMPTY, isToday ? 'Nothing logged yet today' : `Nothing logged on ${fmtDateLabel(selStart)}`, 'Activities appear here after you log them'));
       } else {
         done.forEach(item => completedList.appendChild(createItem(item)));
       }
 
       pendingList.innerHTML = '';
       if (pending.length === 0) {
-        pendingList.appendChild(createEmpty(TODO_EMPTY, 'No pending tasks', 'Add one above and it\'ll show up here'));
+        pendingList.appendChild(createEmpty(TODO_EMPTY, isToday ? 'No tasks scheduled' : `No tasks for ${fmtDateLabel(selStart)}`, 'Add one above and it\'ll show up here'));
       } else {
         pending.forEach(item => pendingList.appendChild(createItem(item)));
       }
@@ -894,13 +1057,18 @@
         progressArc.style.strokeDashoffset = 69.1;
         progressPct.textContent = '0%';
       }
+
+      renderWeekStrip(taskDates);
     }
 
     async function addItem() {
       const raw = taskInput.value.trim();
       if (!raw) return;
 
-      const item = classify(raw);
+      const scheduledAt = taskDate.value
+        ? new Date(taskDate.value + 'T00:00:00').toISOString()
+        : null;
+      const item = classify(raw, scheduledAt);
       const { error } = await supabase.from('items').insert({ ...item, user_id: currentUser.id });
       if (error) {
         console.error(error);
