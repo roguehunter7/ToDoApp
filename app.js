@@ -102,7 +102,7 @@
       for (let i = 0; i < 7; i++) {
         const d = new Date(start);
         d.setDate(d.getDate() + i);
-        const ds = d.toISOString().slice(0, 10);
+        const ds = localDateStr(d);
         const hasTasks = taskDates && taskDates.has(ds);
         const isToday = ds === today();
         const isActive = ds === selectedDate;
@@ -184,9 +184,18 @@
 
     // === Helpers ===
     function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    function localDateStr(d) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+    function localDateFromISO(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return localDateStr(d);
+    }
     function fmtRel(ts) {
       if (!ts) return '';
       const diff = Date.now() - new Date(ts).getTime();
+      if (diff < 0) return '';
       if (diff < 60000) return 'just now';
       if (diff < 3600000) return `${Math.round(diff / 60000)}m ago`;
       return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -308,9 +317,10 @@
             return;
           }
           toast('Account created! Check your email to confirm (if required), then sign in.', 'added');
-          // Switch to login
-          isSignup = false;
+          // Switch to login, preserving email — authToggleBtn.click() toggles isSignup
+          const signedUpEmail = authEmail.value;
           authToggleBtn.click();
+          authEmail.value = signedUpEmail;
         } else {
           result = await supabase.auth.signInWithPassword({ email, password });
           if (result.error) throw result.error;
@@ -355,7 +365,7 @@
 
         const res = await fetch(
           'https://rqhrsildsoxeadchozui.supabase.co/functions/v1/delete-account',
-          { method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}` } }
+          { method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}` }, signal: AbortSignal.timeout(10000) }
         );
 
         if (!res.ok) {
@@ -513,11 +523,11 @@
 
       const items = data || [];
 
-      // Build set of dates that have tasks (for week strip dots) — exclude created_at to avoid false dots
+      // Build set of local dates that have tasks (for week strip dots)
       const taskDates = new Set();
       items.forEach(i => {
-        if (i.status === 'COMPLETED' && i.completed_at) taskDates.add(i.completed_at.slice(0, 10));
-        if (i.entry_type === 'TODO' && i.scheduled_at) taskDates.add(i.scheduled_at.slice(0, 10));
+        if (i.status === 'COMPLETED' && i.completed_at) taskDates.add(localDateFromISO(i.completed_at));
+        if (i.entry_type === 'TODO' && i.scheduled_at) taskDates.add(localDateFromISO(i.scheduled_at));
       });
 
       const done = items.filter(i =>
@@ -575,6 +585,7 @@
       if (!currentUser) { toast('Not signed in', 'deleted'); return; }
       const raw = taskInput.value.trim();
       if (!raw) return;
+      if (raw.length > 1000) { toast('Task too long (max 1000 chars)', 'deleted'); return; }
 
       try {
         const scheduledAt = taskDate.value
@@ -608,8 +619,12 @@
     inputModes.addEventListener('click', e => {
       const btn = e.target.closest('.input-mode');
       if (!btn || btn.classList.contains('active')) return;
-      inputModes.querySelectorAll('.input-mode').forEach(b => b.classList.remove('active'));
+      inputModes.querySelectorAll('.input-mode').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+      });
       btn.classList.add('active');
+      btn.setAttribute('aria-selected', 'true');
       inputMode = btn.dataset.mode;
       // Hide date picker in activity mode, show in task mode
       taskDate.style.display = inputMode === 'done' ? 'none' : 'block';
@@ -655,9 +670,13 @@
     const reportStats = $('reportStats');
     const reportHistory = $('reportHistory');
 
-    reportBtn.addEventListener('click', () => {
+    function openReport() {
       reportDialog.showModal();
       loadReportHistory();
+    }
+    reportBtn.addEventListener('click', openReport);
+    reportBtn.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openReport(); }
     });
     reportClose.addEventListener('click', () => reportDialog.close());
 
@@ -677,7 +696,7 @@
       } else if (periodType === 'weekly') {
         const d = new Date();
         d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // Monday start, correct for Sunday
-        start = d.toISOString().slice(0,10);
+        start = localDateStr(d);
         end = today();
       } else {
         start = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
@@ -737,17 +756,20 @@
     }
 
     async function loadReportHistory() {
+      if (!currentUser) return;
       const { data, error } = await supabase
         .from('reports')
         .select('*')
+        .eq('user_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(10);
 
       // Remove old entries, keep header
-      reportHistory.querySelectorAll('.report-card').forEach(e => e.remove());
+      reportHistory.querySelectorAll('.report-card, .report-empty').forEach(e => e.remove());
 
       if (error || !data?.length) {
         const empty = document.createElement('div');
+        empty.className = 'report-empty';
         empty.style.cssText = 'font-size:12px;color:var(--text-dim);padding:8px 0';
         empty.textContent = 'No summaries generated yet. Tap a button above to create one.';
         reportHistory.appendChild(empty);

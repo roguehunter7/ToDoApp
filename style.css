@@ -20,7 +20,7 @@
         --border-hover: #4a4a3a;
         --text: #ededeb;
         --text-muted: #949488;
-        --text-dim: #636358;
+        --text-dim: #7a7a6e;
         --accent: #e8b44f;
         --accent-glow: rgba(232, 180, 79, .14);
         --cyan: #c9a84c;
@@ -54,7 +54,7 @@
         --border-hover: #c4c1b6;
         --text: #1e1e1a;
         --text-muted: #6b6b60;
-        --text-dim: #9a998c;
+        --text-dim: #7a796c;
         --accent: #c8870b;
         --accent-glow: rgba(200, 135, 11, .1);
         --cyan: #a07008;
@@ -261,9 +261,10 @@
       .stat-badge[data-type="done"] { background: var(--accent-glow); color: var(--accent); }
       .stat-badge[data-type="pending"] { background: var(--cyan-glow); color: var(--cyan); }
 
+      .progress-ring:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
       .progress-ring {
         display: flex; align-items: center; gap: 8px; font-size: 12px; font-family: var(--font-mono);
-        color: var(--text-dim); margin-left: auto;
+        color: var(--text-dim); margin-left: auto; cursor: pointer;
       }
       .progress-ring svg { transform: rotate(-90deg); }
 
@@ -336,7 +337,6 @@
         display: flex; align-items: center; gap: 12px;
         padding: 12px 14px; background: var(--surface-1); border: var(--border-base);
         border-radius: var(--radius); transition: var(--transition);
-        @starting-style { opacity: 0; transform: translateY(8px) scale(.97); }
       }
       .item:hover { border-color: var(--border-hover); background: var(--surface-2); box-shadow: var(--shadow-md); transform: translateY(-1px); }
       .item-text { flex: 1; font-size: 14px; line-height: 1.45; word-break: break-word; min-width: 0; }
@@ -556,10 +556,10 @@
         display: flex; gap: 6px; flex-wrap: wrap;
         margin-top: 4px; min-height: 0;
         transition: opacity .3s ease, max-height .4s ease;
-        overflow: hidden; max-height: 60px;
+        overflow: clip; max-height: 68px; padding-bottom: 4px;
       }
       .chips.hidden {
-        opacity: 0; max-height: 0; margin-top: 0; pointer-events: none;
+        opacity: 0; max-height: 0; margin-top: 0; padding-bottom: 0; pointer-events: none;
       }
       .chip {
         display: inline-flex; align-items: center; gap: 5px;
@@ -573,4 +573,7 @@
         background: var(--surface-3);
       }
       .chip:active { transform: scale(.96); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
     }

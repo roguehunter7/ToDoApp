@@ -5,5 +5,8 @@
   "display": "standalone",
   "theme_color": "#e8b44f",
   "background_color": "#141410",
-  "description": "Minimal todo app with calendar scheduling"
+  "description": "Minimal todo app with calendar scheduling",
+  "icons": [
+    { "src": "/ToDoApp/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
 }

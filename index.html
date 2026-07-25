@@ -7,6 +7,9 @@
   <meta name="theme-color" content="#141410">
   <meta name="description" content="Minimal todo app with calendar scheduling">
   <link rel="manifest" href="/ToDoApp/manifest.json">
+  <link rel="icon" href="/ToDoApp/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/ToDoApp/favicon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -76,7 +79,7 @@
       <div class="stat" id="statPending">
         <span>📋</span> Left to do <span class="stat-badge" id="pendingBadge" data-type="pending">0</span>
       </div>
-      <div class="progress-ring" id="reportBtn" style="cursor:pointer" title="View summaries">
+      <div class="progress-ring" id="reportBtn" role="button" tabindex="0" title="View summaries" aria-haspopup="dialog">
         <svg width="28" height="28">
           <circle cx="14" cy="14" r="11" fill="none" stroke="var(--border)" stroke-width="3"/>
           <circle id="progressArc" cx="14" cy="14" r="11" fill="none"
@@ -102,9 +105,9 @@
     </div>
 
     <div class="input-area">
-      <div class="input-modes" id="inputModes">
-        <button class="input-mode active" data-mode="todo">📝 Task</button>
-        <button class="input-mode" data-mode="done">✨ Activity</button>
+      <div class="input-modes" id="inputModes" role="tablist">
+        <button class="input-mode active" data-mode="todo" role="tab" aria-selected="true">📝 Task</button>
+        <button class="input-mode" data-mode="done" role="tab" aria-selected="false">✨ Activity</button>
       </div>
       <div class="input-wrap">
         <input id="taskInput" type="text"
@@ -146,7 +149,7 @@
     </div>
   </div>
 
-  <div id="loadingScreen" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--surface-0);z-index:999">
+  <div id="loadingScreen" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#141410;z-index:999">
     <div class="spinner"></div>
   </div>
 
