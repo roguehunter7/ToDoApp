@@ -40,7 +40,7 @@
         --radius-sm: 8px;
         --transition: .2s cubic-bezier(.4, 0, .2, 1);
         --bounce: .45s cubic-bezier(.34, 1.56, .64, 1);
-        interpolate-size: allow-keywords;
+
       }
     }
 
@@ -355,12 +355,7 @@
       @keyframes toast-in { from { opacity: 0; transform: translateY(16px) scale(.92); } }
       @keyframes toast-out { to { opacity: 0; transform: translateY(-8px) scale(.95); } }
 
-      /* Stagger */
-      .item-list > :nth-child(1) { animation: slide-in .3s ease both; }
-      .item-list > :nth-child(2) { animation: slide-in .3s ease both; animation-delay: .03s; }
-      .item-list > :nth-child(3) { animation: slide-in .3s ease both; animation-delay: .06s; }
-      .item-list > :nth-child(4) { animation: slide-in .3s ease both; animation-delay: .09s; }
-      @keyframes slide-in { from { opacity: 0; transform: translateY(10px); } }
+
 
       /* Loading spinner */
       .spinner {
@@ -547,7 +542,7 @@
     const confirmCancel = $('confirmCancel');
     const confirmOk = $('confirmOk');
 
-    const CIRCUMFERENCE = 69.1;
+
     let isSignup = false;
     let currentUser = null;
     let isAdmin = false;
@@ -891,10 +886,10 @@
       const total = done.length + pending.length;
       if (total > 0) {
         const pct = Math.round((done.length / total) * 100);
-        progressArc.style.strokeDashoffset = CIRCUMFERENCE - (CIRCUMFERENCE * pct) / 100;
+        progressArc.style.strokeDashoffset = 69.1 - (69.1 * pct) / 100;
         progressPct.textContent = `${pct}%`;
       } else {
-        progressArc.style.strokeDashoffset = CIRCUMFERENCE;
+        progressArc.style.strokeDashoffset = 69.1;
         progressPct.textContent = '0%';
       }
     }
