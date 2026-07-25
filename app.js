@@ -49,6 +49,7 @@
     let isAdmin = false;
     let confirmResolve = null;
     let realtimeChannel = null;
+    let loadSeq = 0;
 
     // Calendar state
     const today = () => {
@@ -85,7 +86,7 @@
 
     function weekStart(offset) {
       const d = new Date();
-      d.setDate(d.getDate() - d.getDay() + 1 + offset * 7); // Monday start
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + offset * 7); // Monday start, correct for Sunday
       d.setHours(0, 0, 0, 0);
       return d;
     }
@@ -178,7 +179,7 @@
 
     // === PWA ===
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/ToDoApp/sw.js');
+      navigator.serviceWorker.register('/ToDoApp/sw.js').catch(() => {});
     }
 
     // === Helpers ===
@@ -219,9 +220,19 @@
       return new Promise(resolve => { confirmResolve = resolve; });
     }
 
-    confirmCancel.addEventListener('click', () => { confirmDialog.close(); if (confirmResolve) confirmResolve(false); });
-    confirmOk.addEventListener('click', () => { confirmDialog.close(); if (confirmResolve) confirmResolve(true); });
-    confirmDialog.addEventListener('close', () => { if (confirmResolve) { confirmResolve(false); confirmResolve = null; } });
+    confirmCancel.addEventListener('click', () => {
+      if (confirmResolve) confirmResolve(false);
+      confirmResolve = null;
+      confirmDialog.close();
+    });
+    confirmOk.addEventListener('click', () => {
+      if (confirmResolve) confirmResolve(true);
+      confirmResolve = null;
+      confirmDialog.close();
+    });
+    confirmDialog.addEventListener('close', () => {
+      if (confirmResolve) { confirmResolve(false); confirmResolve = null; }
+    });
 
     // === Auth state ===
     function showAuth() {
@@ -365,14 +376,14 @@
     supabase.auth.getSession().then(({ data: { session } }) => {
       currentUser = session?.user ?? null;
       handleAuthChange(currentUser);
-    });
+    }).catch(err => { console.error('Auth init failed:', err); setLoading(false); });
 
     supabase.auth.onAuthStateChange((event, session) => {
       currentUser = session?.user ?? null;
-      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-        handleAuthChange(null);
+      if (event === 'SIGNED_OUT') {
+        handleAuthChange(null).catch(() => {});
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        handleAuthChange(currentUser);
+        handleAuthChange(currentUser).catch(() => {});
       }
     });
 
@@ -382,7 +393,7 @@
       if (!admin && user) cfg.filter = `user_id=eq.${user.id}`;
       realtimeChannel = supabase
         .channel('items-changes')
-        .on('postgres_changes', cfg, () => loadItems())
+        .on('postgres_changes', cfg, () => { if (currentUser) loadItems(); })
         .subscribe();
     }
 
@@ -422,16 +433,18 @@
     async function deleteItem(id) {
       const ok = await showConfirm('Delete this item?');
       if (!ok) return;
-      await supabase.from('items').delete().eq('id', id).eq('user_id', currentUser.id);
+      const { error } = await supabase.from('items').delete().eq('id', id).eq('user_id', currentUser.id);
+      if (error) { console.error(error); toast(`Delete failed: ${error.message}`, 'deleted'); return; }
       toast('Deleted', 'deleted');
       loadItems();
     }
 
     async function completeItem(id) {
-      await supabase
+      const { error } = await supabase
         .from('items')
         .update({ status: 'COMPLETED', completed_at: new Date().toISOString() })
         .eq('id', id).eq('user_id', currentUser.id);
+      if (error) { console.error(error); toast(`Complete failed: ${error.message}`, 'deleted'); return; }
       toast('Task completed');
       loadItems();
     }
@@ -482,6 +495,7 @@
 
     async function loadItems() {
       if (!currentUser) return;
+      const seq = ++loadSeq;
 
       const selStart = new Date(selectedDate + 'T00:00:00');
       const selEnd = new Date(selectedDate + 'T23:59:59.999');
@@ -491,18 +505,19 @@
       const { data, error } = await supabase
         .from('items')
         .select('*')
+        .eq('user_id', currentUser.id)
         .order('created_at', { ascending: true });
 
       if (error) { console.error(error); return; }
+      if (seq !== loadSeq) return; // stale response
 
       const items = data || [];
 
-      // Build set of dates that have tasks (for week strip dots)
+      // Build set of dates that have tasks (for week strip dots) — exclude created_at to avoid false dots
       const taskDates = new Set();
       items.forEach(i => {
-        if (i.completed_at) taskDates.add(i.completed_at.slice(0, 10));
-        if (i.scheduled_at) taskDates.add(i.scheduled_at.slice(0, 10));
-        if (i.created_at) taskDates.add(i.created_at.slice(0, 10));
+        if (i.status === 'COMPLETED' && i.completed_at) taskDates.add(i.completed_at.slice(0, 10));
+        if (i.entry_type === 'TODO' && i.scheduled_at) taskDates.add(i.scheduled_at.slice(0, 10));
       });
 
       const done = items.filter(i =>
@@ -557,30 +572,37 @@
     }
 
     async function addItem() {
+      if (!currentUser) { toast('Not signed in', 'deleted'); return; }
       const raw = taskInput.value.trim();
       if (!raw) return;
 
-      const scheduledAt = taskDate.value
-        ? new Date(taskDate.value + 'T00:00:00').toISOString()
-        : null;
-      const item = classify(raw, scheduledAt);
-      const { error } = await supabase.from('items').insert({ ...item, user_id: currentUser.id });
-      if (error) {
-        console.error(error);
-        toast('Error saving task', 'deleted');
-        return;
+      try {
+        const scheduledAt = taskDate.value
+          ? new Date(taskDate.value + 'T00:00:00').toISOString()
+          : null;
+        const item = classify(raw, scheduledAt);
+        const { error } = await supabase.from('items').insert({ ...item, user_id: currentUser.id });
+        if (error) {
+          console.error(error);
+          toast(`Error saving: ${error.message}`, 'deleted');
+          return;
+        }
+        taskInput.value = '';
+        taskInput.focus();
+        localStorage.setItem('pulsetask_used', '1');
+        chips.classList.add('hidden');
+        toast(item.entry_type === 'TODO' ? 'Task added' : 'Activity logged', 'added');
+        loadItems();
+      } catch (err) {
+        console.error(err);
+        toast(`Unexpected error: ${err.message}`, 'deleted');
       }
-      taskInput.value = '';
-      taskInput.focus();
-      // Hide chips after first real use
-      localStorage.setItem('pulsetask_used', '1');
-      chips.classList.add('hidden');
-      toast(item.entry_type === 'TODO' ? 'Task added' : 'Activity logged', 'added');
-      loadItems();
     }
 
     addBtn.addEventListener('click', addItem);
-    taskInput.addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
+    taskInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); addItem(); }
+    });
 
     // === Input mode switching ===
     inputModes.addEventListener('click', e => {
@@ -614,7 +636,7 @@
         e.preventDefault();
         taskInput.focus();
       }
-      if (e.key === 'Escape' && currentUser) {
+      if (e.key === 'Escape' && currentUser && !confirmDialog.open && !reportDialog.open) {
         selectedDate = today();
         taskDate.value = selectedDate;
         weekOffset = 0;
@@ -654,7 +676,7 @@
         end = today();
       } else if (periodType === 'weekly') {
         const d = new Date();
-        d.setDate(d.getDate() - d.getDay() + 1);
+        d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // Monday start, correct for Sunday
         start = d.toISOString().slice(0,10);
         end = today();
       } else {
