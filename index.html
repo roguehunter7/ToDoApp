@@ -552,6 +552,7 @@
     let currentUser = null;
     let isAdmin = false;
     let confirmResolve = null;
+    let realtimeChannel = null;
 
     // === Helpers ===
     function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
@@ -741,14 +742,26 @@
       }
     });
 
+    function subscribeRealtime(user, admin) {
+      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+      const cfg = { event: '*', schema: 'public', table: 'items' };
+      if (!admin && user) cfg.filter = `user_id=eq.${user.id}`;
+      realtimeChannel = supabase
+        .channel('items-changes')
+        .on('postgres_changes', cfg, () => loadItems())
+        .subscribe();
+    }
+
     async function handleAuthChange(user) {
       setLoading(false);
       if (user) {
         showApp();
         updateUserUI(user);
         await checkAdmin(user);
+        subscribeRealtime(user, isAdmin);
         loadItems();
       } else {
+        if (realtimeChannel) { supabase.removeChannel(realtimeChannel); realtimeChannel = null; }
         showAuth();
       }
     }
@@ -913,11 +926,6 @@
       }
     });
 
-    // Realtime
-    supabase
-      .channel('items-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, loadItems)
-      .subscribe();
   </script>
 </body>
 </html>
