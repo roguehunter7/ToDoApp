@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PulseTask</title>
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="description" content="Minimal todo app with calendar scheduling">
+  <link rel="manifest" href="/ToDoApp/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/@supabase/supabase-js@2" crossorigin="anonymous"></script>
@@ -21,6 +24,7 @@
 
     @layer theme {
       :root {
+        color-scheme: dark;
         --surface-0: #0a0a0f;
         --surface-1: #111118;
         --surface-2: #181825;
@@ -41,6 +45,25 @@
         --transition: .2s cubic-bezier(.4, 0, .2, 1);
         --bounce: .45s cubic-bezier(.34, 1.56, .64, 1);
 
+      }
+
+      [data-theme="light"] {
+        color-scheme: light;
+        --surface-0: #f0f0f3;
+        --surface-1: #ffffff;
+        --surface-2: #f5f5f8;
+        --surface-3: #ebebf0;
+        --border: #d4d4dc;
+        --border-hover: #b0b0bc;
+        --text: #1a1a2e;
+        --text-muted: #5c5c72;
+        --text-dim: #8e8ea6;
+        --accent: #059669;
+        --accent-glow: rgba(5, 150, 105, .12);
+        --cyan: #0891b2;
+        --cyan-glow: rgba(8, 145, 178, .1);
+        --red: #dc2626;
+        --red-glow: rgba(220, 38, 38, .1);
       }
     }
 
@@ -146,6 +169,14 @@
         -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         background-clip: text;
       }
+
+      .theme-toggle {
+        width: 32px; height: 32px; padding: 0;
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: var(--radius-sm); font-size: 16px; cursor: pointer;
+        transition: var(--transition); line-height: 1;
+      }
+      .theme-toggle:hover { background: var(--surface-3); border-color: var(--border-hover); }
 
       .topbar-right { margin-left: auto; position: relative; }
 
@@ -412,7 +443,6 @@
         border: 1px solid var(--border); border-radius: var(--radius);
         color: var(--text); font-size: 13px; cursor: pointer;
         outline: none; transition: var(--transition); max-width: 140px;
-        color-scheme: dark;
       }
       .date-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
     }
@@ -452,6 +482,7 @@
     <div class="topbar">
       <div class="topbar-left">
         <span class="topbar-logo">PulseTask</span>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme">☀️</button>
       </div>
       <div class="topbar-right">
         <button class="user-btn" id="userBtn">
@@ -691,6 +722,34 @@
       }
     });
     taskDate.value = selectedDate;
+
+    // === Theme ===
+    const themeToggle = $('themeToggle');
+    const html = document.documentElement;
+
+    function setTheme(t) {
+      html.dataset.theme = t;
+      themeToggle.textContent = t === 'dark' ? '☀️' : '🌙';
+      document.querySelector('meta[name="theme-color"]').content = t === 'dark' ? '#0a0a0f' : '#f0f0f3';
+    }
+
+    const saved = localStorage.getItem('theme');
+    if (saved) { setTheme(saved); }
+    else {
+      const prefers = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      setTheme(prefers);
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+      setTheme(next);
+      localStorage.setItem('theme', next);
+    });
+
+    // === PWA ===
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/ToDoApp/sw.js');
+    }
 
     // === Helpers ===
     function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }

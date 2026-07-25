@@ -1,0 +1,9 @@
+{
+  "name": "PulseTask",
+  "short_name": "PulseTask",
+  "start_url": "/ToDoApp/",
+  "display": "standalone",
+  "theme_color": "#34d399",
+  "background_color": "#0a0a0f",
+  "description": "Minimal todo app with calendar scheduling"
+}
