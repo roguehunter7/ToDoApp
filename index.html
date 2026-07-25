@@ -720,7 +720,8 @@
         toast(`Failed to delete account: ${err.message}`, 'deleted');
         return;
       }
-      // Page will re-render due to auth state change
+      await supabase.auth.signOut();
+      handleAuthChange(null);
     });
 
     // === Supabase auth listener ===
