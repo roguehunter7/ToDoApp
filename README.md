@@ -9,7 +9,7 @@ Todo + activity tracker with auth, calendar scheduling, and AI summaries. Vanill
 - **Vanilla JS** — ES modules, no framework, no build
 - **Supabase** — Auth, Postgres with RLS, Realtime, Edge Functions
 - **GitHub Pages** — auto-deployed on push to `main`
-- **PWA** — installable, cached app shell
+- **PWA** — installable, cached app shell with offline fallback
 
 ## Features
 
@@ -22,11 +22,14 @@ Todo + activity tracker with auth, calendar scheduling, and AI summaries. Vanill
 - Real-time sync across open tabs
 - **AI Summaries** — daily / weekly / monthly reports via DeepSeek v4 Flash (Edge Function)
 - **Tags** — organize tasks with tags, click to filter
-- **Recurring tasks** — daily / weekly / monthly repeats (auto-created on complete)
-- **Inline edit** — double-click a pending task to edit
-- **Undo complete** — 5-second undo bar after completing a task
+- **Recurring tasks** — daily / weekly / monthly repeats (auto-created on complete, month-end clamped)
+- **Inline edit** — double-click a pending task to edit (keyboard-accessible via Enter)
+- **Undo complete** — 5-second undo bar after completing a task (survives page navigation)
 - **Export** — download all data as JSON from the user menu
 - `⌘K` focus input, `Enter` add, quick-add chips (hide after first use)
+- **Dark/light theme** — toggle persisted to localStorage
+- **Security** — Content-Security-Policy, Subresource Integrity on CDN scripts, safe error messages
+- **Accessibility** — ARIA labels, landmarks, live regions, keyboard navigation, WCAG-contrast buttons
 
 ## Database
 
@@ -41,12 +44,16 @@ RLS: users CRUD own items; admins SELECT all; reports insert via service role.
 ## Project structure
 
 ```
-├── index.html     App shell + dialogs
-├── style.css      Layered CSS (reset → theme → base → components)
-├── app.js         All app logic
-├── sw.js          Service worker
-├── manifest.json  PWA manifest
-├── favicon.svg    SVG icon
+├── index.html         App shell + dialogs
+├── style.css          Layered CSS (reset → theme → base → components)
+├── app.js             All app logic
+├── sw.js              Service worker
+├── manifest.json      PWA manifest
+├── offline.html       Offline fallback page
+├── favicon.svg        SVG icon
+├── icon-192.png       192×192 PWA icon
+├── icon-512.png       512×512 PWA icon
+├── apple-touch-icon.png
 └── README.md
 ```
 
@@ -63,5 +70,11 @@ To run your own instance: create a Supabase project, create the tables, set up R
 | Key | Action |
 |-----|--------|
 | `Enter` | Add task/activity |
+| `Enter` (on task text) | Start inline edit |
 | `⌘K` / `Ctrl+K` | Focus input |
-| `Escape` | Reset to today / close dialog |
+| `Escape` | Cancel inline edit / close dialog / reset to today |
+
+## Bug fixes
+
+See [BUGS.md](./BUGS.md) for the full audit. 43 of 48 identified bugs fixed across
+security, logic, accessibility, PWA, and code quality.
