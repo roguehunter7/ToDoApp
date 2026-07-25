@@ -1,6 +1,6 @@
 {
-  "name": "Daymark",
-  "short_name": "Daymark",
+  "name": "DayMark",
+  "short_name": "DayMark",
   "start_url": "/ToDoApp/",
   "scope": "/ToDoApp/",
   "display": "standalone",
