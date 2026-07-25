@@ -660,7 +660,10 @@
     let realtimeChannel = null;
 
     // Calendar state
-    const today = () => new Date().toISOString().slice(0, 10);
+    const today = () => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    };
     let selectedDate = today();
     let weekOffset = 0;
 
@@ -1076,7 +1079,7 @@
       if (!currentUser) return;
 
       const selStart = new Date(selectedDate + 'T00:00:00');
-      const selEnd = new Date(selectedDate + 'T23:59:59.999Z');
+      const selEnd = new Date(selectedDate + 'T23:59:59.999');
       const selStartIso = selStart.toISOString();
       const selEndIso = selEnd.toISOString();
 
