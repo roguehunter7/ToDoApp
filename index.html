@@ -6,14 +6,24 @@
   <title>PulseTask</title>
   <meta name="theme-color" content="#141410">
   <meta name="description" content="Minimal todo app with calendar scheduling">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self';
+      script-src 'self' https://unpkg.com 'unsafe-inline';
+      connect-src 'self' https://rqhrsildsoxeadchozui.supabase.co https://*.supabase.co wss://*.supabase.co;
+      style-src 'self' https://fonts.googleapis.com 'unsafe-inline';
+      font-src 'self' https://fonts.gstatic.com;
+      img-src 'self' data:;
+      manifest-src 'self'">
   <link rel="manifest" href="/ToDoApp/manifest.json">
   <link rel="icon" href="/ToDoApp/favicon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/ToDoApp/favicon.svg">
+  <link rel="apple-touch-icon" href="/ToDoApp/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <script src="https://unpkg.com/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2" crossorigin="anonymous"
+    integrity="sha384-M65KxMm/JqBppck6onbmAgPVMBHrmPCf1L17Q+71EcvI9/VVI8j5cqoxQf6lj6h2"></script>
   <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -22,9 +32,9 @@
       <div class="auth-logo">PulseTask</div>
       <p class="auth-sub" id="authSub">Sign in to continue</p>
 
-      <div class="auth-error" id="authError"></div>
+      <div class="auth-error" id="authError" role="alert"><!-- L23: alert role --></div>
 
-      <form id="authForm">
+      <form id="authForm" novalidate>
         <div class="auth-field">
           <label for="authEmail">Email</label>
           <input id="authEmail" type="email" placeholder="you@email.com" autocomplete="email" required>
@@ -37,13 +47,13 @@
       </form>
 
       <div class="auth-toggle">
-        <span id="authToggleText">Don't have an account?</span>
+        <span>Don't have an account?</span>
         <button id="authToggleBtn">Sign Up</button>
       </div>
     </div>
   </div>
 
-  <div id="app" class="app" style="display:none">
+  <main id="app" class="app" style="display:none"><!-- L20: main landmark -->
     <div class="topbar">
       <div class="topbar-left">
         <span class="topbar-logo">PulseTask</span>
@@ -78,10 +88,10 @@
 
     <div class="stats">
       <div class="stat" id="statDone">
-        <span>✅</span> Done today <span class="stat-badge" id="doneBadge" data-type="done">0</span>
+        <span aria-hidden="true">✅</span> Done today <span class="stat-badge" id="doneBadge" data-type="done">0</span>
       </div>
       <div class="stat" id="statPending">
-        <span>📋</span> Left to do <span class="stat-badge" id="pendingBadge" data-type="pending">0</span>
+        <span aria-hidden="true">📋</span> Left to do <span class="stat-badge" id="pendingBadge" data-type="pending">0</span>
       </div>
       <div class="progress-ring" id="reportBtn" role="button" tabindex="0" title="View summaries" aria-haspopup="dialog">
         <svg width="28" height="28">
@@ -116,15 +126,15 @@
       </div>
       <div class="input-wrap">
         <input id="taskInput" type="text"
-          placeholder="What do you need to do?"
+          placeholder="What do you need to do?" aria-label="New task"
           autofocus>
         <div class="input-hint">
           <kbd>⌘K</kbd> <kbd>↵</kbd>
         </div>
       </div>
       <div class="input-row">
-        <input type="date" id="taskDate" class="date-input" title="Schedule for date">
-        <select id="recurrenceSelect" class="date-input recurrence-input" title="Repeat">
+        <input type="date" id="taskDate" class="date-input" title="Schedule for date" aria-label="Schedule for date">
+        <select id="recurrenceSelect" class="date-input recurrence-input" title="Repeat" aria-label="Repeat">
           <option value="">No repeat</option>
           <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
@@ -137,12 +147,12 @@
       </div>
       <div class="input-extras">
         <button class="btn-text" id="tagToggle" style="font-size:12px;color:var(--text-dim);background:none;border:none;cursor:pointer;padding:4px 0">+ tags</button>
-        <input type="text" id="tagsField" placeholder="work, personal, errands" style="display:none;width:100%;padding:8px 10px;background:var(--surface-2);border:var(--border-base);border-radius:var(--radius-sm);color:var(--text);font-size:12px;outline:none;margin-top:4px">
+        <input type="text" id="tagsField" placeholder="work, personal, errands" aria-label="Tags (comma-separated)" style="display:none;width:100%;padding:8px 10px;background:var(--surface-2);border:var(--border-base);border-radius:var(--radius-sm);color:var(--text);font-size:12px;outline:none;margin-top:4px">
       </div>
       <div class="chips" id="chips">
-        <button class="chip" data-text="Buy groceries">🛒 Buy groceries</button>
-        <button class="chip" data-text="Read for 20 min">📖 Read for 20 min</button>
-        <button class="chip" data-text="Gym workout">💪 Gym workout</button>
+        <button class="chip" data-text="Buy groceries"><span aria-hidden="true">🛒</span> Buy groceries</button>
+        <button class="chip" data-text="Read for 20 min"><span aria-hidden="true">📖</span> Read for 20 min</button>
+        <button class="chip" data-text="Gym workout"><span aria-hidden="true">💪</span> Gym workout</button>
       </div>
     </div>
 
@@ -163,13 +173,13 @@
         <div class="item-list" id="pendingList"></div>
       </div>
     </div>
-  </div>
+  </main>
 
-  <div id="loadingScreen" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#141410;z-index:999">
+  <div id="loadingScreen" role="progressbar" aria-label="Loading" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#141410;z-index:999">
     <div class="spinner"></div>
   </div>
 
-  <dialog id="confirmDialog">
+  <dialog id="confirmDialog" aria-labelledby="confirmMsg">
     <p id="confirmMsg" style="font-size:14px;line-height:1.5;margin-bottom:20px;font-weight:500"></p>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button class="btn-outline" id="confirmCancel">Cancel</button>
@@ -177,9 +187,9 @@
     </div>
   </dialog>
 
-  <dialog id="reportDialog">
+  <dialog id="reportDialog" aria-labelledby="reportDialogTitle">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <span style="font-size:16px;font-weight:700">Reports & Summaries</span>
+      <span id="reportDialogTitle" style="font-size:16px;font-weight:700">Reports & Summaries</span>
       <button class="btn-icon" id="reportClose" title="Close">✕</button>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
@@ -201,6 +211,6 @@
     </div>
   </dialog>
 
-  <div class="toast-container" id="toastContainer"></div>
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 </body>
 </html>

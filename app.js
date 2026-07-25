@@ -192,7 +192,8 @@
 
     // === PWA ===
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/ToDoApp/sw.js').catch(() => {});
+      // L9: relative path works regardless of deployment subpath
+      navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {});
     }
 
     // === Helpers ===
@@ -212,6 +213,26 @@
       if (diff < 60000) return 'just now';
       if (diff < 3600000) return `${Math.round(diff / 60000)}m ago`;
       return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // M1: Map raw errors to user-safe messages so internals aren't leaked
+    const SAFE_ERRORS = {
+      'Failed to load': 'Could not load data. Check your connection.',
+      'Error saving': 'Could not save. Please try again.',
+      'Delete failed': 'Could not delete. Please try again.',
+      'Complete failed': 'Could not update item. Please try again.',
+      'Export failed': 'Export failed. Please try again.',
+      'Edit failed': 'Could not save edit. Please try again.',
+      'Failed to generate summary': 'Could not generate summary. Please try again.',
+      'Failed to load report history': 'Could not load previous reports.',
+      'Failed to delete account': 'Account deletion failed. Please try again.',
+      'Unexpected error': 'Something went wrong. Please try again.',
+    };
+    function safeError(msg) {
+      for (const [key, val] of Object.entries(SAFE_ERRORS)) {
+        if (msg.includes(key)) return val;
+      }
+      return 'Something went wrong. Please try again.';
     }
 
     function toast(msg, type = 'done') {
@@ -238,6 +259,7 @@
 
     function showConfirm(msg) {
       confirmMsg.textContent = msg;
+      lastFocused = document.activeElement;
       confirmDialog.showModal();
       return new Promise(resolve => { confirmResolve = resolve; });
     }
@@ -246,11 +268,13 @@
       if (confirmResolve) confirmResolve(false);
       confirmResolve = null;
       confirmDialog.close();
+      if (lastFocused) lastFocused.focus();
     });
     confirmOk.addEventListener('click', () => {
       if (confirmResolve) confirmResolve(true);
-      confirmResolve = null;
       confirmDialog.close();
+      confirmResolve = null; // L16: close first, then nullify
+      if (lastFocused) lastFocused.focus();
     });
     confirmDialog.addEventListener('close', () => {
       if (confirmResolve) { confirmResolve(false); confirmResolve = null; }
@@ -361,8 +385,9 @@
     $('exportBtn').addEventListener('click', async () => {
       userDropdown.classList.remove('open');
       if (!currentUser) return;
-      const { data, error } = await supabase.from('items').select('*').eq('user_id', currentUser.id);
-      if (error) { toast(`Export failed: ${error.message}`, 'deleted'); return; }
+    // L1: Explicit columns instead of select('*')
+      const { data, error } = await supabase.from('items').select('id,user_id,text,entry_type,status,scheduled_at,completed_at,tags,recurrence,recurrence_origin_id,created_at').eq('user_id', currentUser.id);
+      if (error) { toast(safeError(error.message || 'Export failed'), 'deleted'); return; }
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -378,7 +403,8 @@
       await supabase.auth.signOut();
     });
 
-    // Delete account
+    // Delete account — L4: no RPC fallback (would bypass edge function auth)
+    const ACCT_DEL_TIMEOUT = 10000;
     deleteAccountBtn.addEventListener('click', async () => {
       userDropdown.classList.remove('open');
       const ok = await showConfirm(
@@ -391,19 +417,18 @@
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error('No session');
 
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), ACCT_DEL_TIMEOUT);
         const res = await fetch(
           'https://rqhrsildsoxeadchozui.supabase.co/functions/v1/delete-account',
-          { method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}` }, signal: AbortSignal.timeout(10000) }
+          { method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}` }, signal: controller.signal }
         );
+        clearTimeout(tid);
 
-        if (!res.ok) {
-          // Fallback: try RPC
-          const { error: rpcErr } = await supabase.rpc('delete_my_account');
-          if (rpcErr) throw new Error(rpcErr.message);
-        }
+        if (!res.ok) throw new Error('Account deletion rejected');
       } catch (err) {
         setLoading(false);
-        toast(`Failed to delete account: ${err.message}`, 'deleted');
+        toast(safeError('Failed to delete account'), 'deleted');
         return;
       }
       await supabase.auth.signOut();
@@ -425,13 +450,13 @@
       }
     });
 
-    function subscribeRealtime(user, admin) {
+    // H2: Admin realtime — always scope to user regardless of admin flag for defense-in-depth
+    // M2: skip refresh while a tag filter is active to avoid flashing the unfiltered list
+    function subscribeRealtime(user) {
       if (realtimeChannel) supabase.removeChannel(realtimeChannel);
-      const cfg = { event: '*', schema: 'public', table: 'items' };
-      if (!admin && user) cfg.filter = `user_id=eq.${user.id}`;
       realtimeChannel = supabase
         .channel('items-changes')
-        .on('postgres_changes', cfg, () => { if (currentUser) loadItems(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'items', filter: `user_id=eq.${user.id}` }, () => { if (currentUser && !activeTagFilter) loadItems(); })
         .subscribe();
     }
 
@@ -441,7 +466,7 @@
         showApp();
         updateUserUI(user);
         await checkAdmin(user);
-        subscribeRealtime(user, isAdmin);
+        subscribeRealtime(user);
         loadItems();
       } else {
         if (realtimeChannel) { supabase.removeChannel(realtimeChannel); realtimeChannel = null; }
@@ -469,13 +494,15 @@
       return { text: t, entry_type: 'TODO', status: 'PENDING', scheduled_at: scheduledAt || null, completed_at: null };
     }
 
+    // H3: await loadItems after each mutation so UI never contradicts the toast
     async function deleteItem(id) {
       const ok = await showConfirm('Delete this item?');
       if (!ok) return;
       const { error } = await supabase.from('items').delete().eq('id', id).eq('user_id', currentUser.id);
-      if (error) { console.error(error); toast(`Delete failed: ${error.message}`, 'deleted'); return; }
+      if (error) { console.error(error); toast(safeError(error.message || 'Delete failed'), 'deleted'); return; }
       toast('Deleted', 'deleted');
-      loadItems();
+      const loadErr = await loadItems().catch(() => true);
+      if (loadErr) toast('Data may be out of date — refresh', 'deleted');
     }
 
     async function completeItem(id) {
@@ -491,7 +518,7 @@
         .from('items')
         .update({ status: 'COMPLETED', completed_at: new Date().toISOString() })
         .eq('id', id).eq('user_id', currentUser.id);
-      if (error) { console.error(error); toast(`Complete failed: ${error.message}`, 'deleted'); return; }
+      if (error) { console.error(error); toast(safeError(error.message || 'Complete failed'), 'deleted'); return; }
 
       // Create next occurrence for recurring tasks (deduped)
       if (item?.recurrence) {
@@ -502,10 +529,16 @@
           .eq('status', 'PENDING')
           .maybeSingle();
         if (!existing) {
-          const nextDate = new Date();
+          // M3: normalize to midnight so the date-range filter matches
+          const nextDate = new Date(today() + 'T00:00:00');
           if (item.recurrence === 'daily') nextDate.setDate(nextDate.getDate() + 1);
           else if (item.recurrence === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
-          else if (item.recurrence === 'monthly') nextDate.setMonth(nextDate.getMonth() + 1);
+          else if (item.recurrence === 'monthly') {
+            // H6: clamp to month-end (fixes Jan 31 → Feb 28 instead of Mar 3)
+            const origDay = nextDate.getDate();
+            nextDate.setMonth(nextDate.getMonth() + 1);
+            if (nextDate.getDate() !== origDay) nextDate.setDate(0);
+          }
           await supabase.from('items').insert({
             user_id: currentUser.id, text: item.text, entry_type: item.entry_type || 'TODO',
             status: 'PENDING', tags: item.tags || [], recurrence: item.recurrence,
@@ -551,37 +584,55 @@
           bar.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;box-shadow:var(--shadow-lg);animation:toast-in .45s cubic-bezier(.34,1.56,.64,1);pointer-events:auto';
           bar.innerHTML = `<span>✅ Task done</span><button class="undo-btn" style="margin-left:auto;background:none;border:none;color:var(--accent);font-weight:700;font-size:13px;cursor:pointer;padding:4px 8px">Undo</button>`;
           toastContainer.appendChild(bar);
+          // H5: persist undo in sessionStorage so it survives navigation
           pendingUndos.set(item.id, true);
+          sessionStorage.setItem('pulsetask_undo', item.id);
+          sessionStorage.setItem('pulsetask_undo_exp', String(Date.now() + 5000));
           const t = setTimeout(async () => {
             pendingUndos.delete(item.id);
+            sessionStorage.removeItem('pulsetask_undo');
+            sessionStorage.removeItem('pulsetask_undo_exp');
             bar.remove();
-            await completeItem(item.id);
+            try { await completeItem(item.id); } catch (e) { /* M11: re-add bar on failure */
+              bar.querySelector('span').textContent = '⚠️ Completion failed — try again';
+              bar.querySelector('.undo-btn').textContent = 'Retry';
+              bar.querySelector('.undo-btn').onclick = () => { bar.remove(); completeItem(item.id); };
+              pendingUndos.set(item.id, true);
+            }
           }, 5000);
           bar.querySelector('.undo-btn').onclick = () => {
             if (!pendingUndos.has(item.id)) return;
             pendingUndos.delete(item.id);
+            sessionStorage.removeItem('pulsetask_undo');
+            sessionStorage.removeItem('pulsetask_undo_exp');
             clearTimeout(t); bar.remove();
           };
         });
-        // Inline edit on double-click
+        // Inline edit: double-click or Enter on focused item (M7: keyboard accessible)
         const textSpan = div.querySelector('.item-text');
-        textSpan.addEventListener('dblclick', () => {
-          textSpan.contentEditable = 'true'; textSpan.focus();
-          const r = document.createRange(); r.selectNodeContents(textSpan);
-          const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        textSpan.tabIndex = 0;
+        textSpan.addEventListener('dblclick', startEdit);
+        textSpan.addEventListener('keydown', function ke(e) {
+          if (e.key === 'Enter' && !this.isContentEditable) { e.preventDefault(); startEdit.call(this); }
         });
+        function startEdit() {
+          this.contentEditable = 'true'; this.focus();
+          const r = document.createRange(); r.selectNodeContents(this);
+          const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        }
         textSpan.addEventListener('blur', async () => {
           textSpan.contentEditable = 'false';
           const nt = textSpan.textContent.trim();
           if (nt && nt !== item.text) {
             const { error: e } = await supabase.from('items').update({ text: nt }).eq('id', item.id).eq('user_id', currentUser.id);
-            if (e) { toast(`Edit failed: ${e.message}`, 'deleted'); textSpan.textContent = item.text; }
+            if (e) { toast(safeError(e.message || 'Edit failed'), 'deleted'); textSpan.textContent = item.text; }
             else item.text = nt;
           } else textSpan.textContent = item.text;
         });
         textSpan.addEventListener('keydown', e => {
           if (e.key === 'Enter') { e.preventDefault(); textSpan.blur(); }
-          if (e.key === 'Escape') { textSpan.textContent = item.text; textSpan.contentEditable = 'false'; }
+          // C3: stopPropagation prevents Escape from resetting calendar
+          if (e.key === 'Escape') { e.stopPropagation(); textSpan.textContent = item.text; textSpan.contentEditable = 'false'; }
         });
         // Tag filter click
         div.querySelectorAll('.tag-pill').forEach(p => {
@@ -625,7 +676,7 @@
         .eq('user_id', currentUser.id)
         .order('created_at', { ascending: true });
 
-      if (error) { console.error(error); toast(`Failed to load: ${error.message}`, 'deleted'); return; }
+      if (error) { console.error(error); toast(safeError(error.message || 'Failed to load'), 'deleted'); return; }
       if (seq !== loadSeq) return; // stale response
 
       const items = data || [];
@@ -704,9 +755,9 @@
     const tagFilterBar = $('tagFilterBar');
     const allItems = [];
 
+    // L15: no redundant renderTagFilterBar here — loadItems calls it
     function filterByTag(tag) {
       activeTagFilter = activeTagFilter === tag ? null : tag;
-      renderTagFilterBar();
       loadItems();
     }
 
@@ -729,6 +780,8 @@
       if (!raw) return;
       if (raw.length > 1000) { toast('Task too long (max 1000 chars)', 'deleted'); return; }
 
+      // M10: disable add button to prevent double-add
+      addBtn.disabled = true;
       try {
         const scheduledAt = taskDate.value
           ? new Date(taskDate.value + 'T00:00:00').toISOString()
@@ -736,13 +789,15 @@
         const item = classify(raw, scheduledAt);
         const extras = {};
         if (item.entry_type === 'TODO') {
-          extras.tags = tagsField.value.split(',').map(t => t.trim()).filter(Boolean);
+          extras.tags = tagsField.value.split(',').map(t => t.trim()).filter(Boolean).slice(0, 20);
+          if (extras.tags.some(t => t.length > 50)) { toast('Tags must be 50 chars or fewer', 'deleted'); addBtn.disabled = false; return; }
           extras.recurrence = recurrenceSelect.value || null;
         }
         const { error } = await supabase.from('items').insert({ ...item, user_id: currentUser.id, ...extras });
         if (error) {
           console.error(error);
-          toast(`Error saving: ${error.message}`, 'deleted');
+          toast(safeError(error.message || 'Error saving'), 'deleted');
+          addBtn.disabled = false;
           return;
         }
         taskInput.value = '';
@@ -753,11 +808,12 @@
         localStorage.setItem('pulsetask_used', '1');
         chips.classList.add('hidden');
         toast(item.entry_type === 'TODO' ? 'Task added' : 'Activity logged', 'added');
-        loadItems();
+        await loadItems();
       } catch (err) {
         console.error(err);
-        toast(`Unexpected error: ${err.message}`, 'deleted');
+        toast(safeError(err.message || 'Unexpected error'), 'deleted');
       }
+      addBtn.disabled = false;
     }
 
     addBtn.addEventListener('click', addItem);
@@ -801,7 +857,8 @@
         e.preventDefault();
         taskInput.focus();
       }
-      if (e.key === 'Escape' && currentUser && !confirmDialog.open && !reportDialog.open) {
+      // M13: guard against dialog Escape bubbling after native close
+      if (e.key === 'Escape' && currentUser && !confirmDialog.open && !reportDialog.open && !e.target.closest('dialog')) {
         selectedDate = today();
         taskDate.value = selectedDate;
         weekOffset = 0;
@@ -824,17 +881,24 @@
       reportDialog.showModal();
       loadReportHistory();
     }
-    reportBtn.addEventListener('click', openReport);
+    // M8: track focus origin so we can return focus after dialog closes
+    let lastFocused = null;
+    reportBtn.addEventListener('click', () => { lastFocused = reportBtn; openReport(); });
     reportBtn.addEventListener('keydown', e => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openReport(); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); lastFocused = reportBtn; openReport(); }
     });
-    reportClose.addEventListener('click', () => reportDialog.close());
+    reportClose.addEventListener('click', () => { reportDialog.close(); if (lastFocused) lastFocused.focus(); });
+    reportDialog.addEventListener('close', () => { if (lastFocused) { lastFocused.focus(); lastFocused = null; } });
 
     document.querySelectorAll('[data-period]').forEach(btn => {
       btn.addEventListener('click', () => generateReport(btn.dataset.period));
     });
 
+    // M12: guard concurrent report requests
+    let reportLoading_ = false;
     async function generateReport(periodType) {
+      if (reportLoading_) return;
+      reportLoading_ = true;
       reportResult.style.display = 'none';
       reportLoading.style.display = 'block';
 
@@ -870,18 +934,19 @@
         );
 
         if (!res.ok) {
-          const err = await res.json();
+          const err = await res.json().catch(() => ({}));
           throw new Error(err.error || 'Failed to generate summary');
         }
 
         const data = await res.json();
         displayReport(data);
-        loadReportHistory();
+        await loadReportHistory();
       } catch (err) {
-        reportSummary.textContent = `Error: ${err.message}`;
+        reportSummary.textContent = safeError(err.message || 'Failed to generate summary');
         reportResult.style.display = 'block';
       }
       reportLoading.style.display = 'none';
+      reportLoading_ = false;
     }
 
     function displayReport(data) {
@@ -914,10 +979,10 @@
         .order('created_at', { ascending: false })
         .limit(10);
 
-      // Remove old entries, keep header
-      reportHistory.querySelectorAll('.report-card, .report-empty').forEach(e => e.remove());
-
       if (error) { console.error(error); toast('Failed to load report history', 'deleted'); return; }
+
+      // Remove old entries, keep header (M4: after error check so we don't wipe on failure)
+      reportHistory.querySelectorAll('.report-card, .report-empty').forEach(e => e.remove());
       if (!data?.length) {
         const empty = document.createElement('div');
         empty.className = 'report-empty';

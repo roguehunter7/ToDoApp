@@ -31,13 +31,8 @@
         --radius-sm: 8px;
         --transition: .2s cubic-bezier(.4, 0, .2, 1);
         --bounce: .45s cubic-bezier(.34, 1.56, .64, 1);
-        --border-base: 1px solid var(--border);
-        --border-hover-base: 1px solid var(--border-hover);
-        --shadow-sm: 0 1px 3px rgba(0,0,0,.3);
         --shadow-md: 0 4px 12px rgba(0,0,0,.3);
         --shadow-lg: 0 12px 40px rgba(0,0,0,.5);
-        --focus-ring: 0 0 0 3px var(--accent-glow);
-        --radius-full: 100px;
         --pulse: #E06B6B;
         --pulse-glow: rgba(224, 107, 107, .12);
         --font-mono: 'JetBrains Mono', monospace;
@@ -77,6 +72,15 @@
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
       input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px var(--surface-2) inset; -webkit-text-fill-color: var(--text); }
+
+      /* L14: dialog baseline moved from components to base */
+      dialog {
+        background: var(--surface-2); color: var(--text); border: var(--border-base);
+        border-radius: var(--radius); padding: 24px; max-width: 380px; width: 90vw;
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        box-shadow: var(--shadow-lg);
+      }
+      dialog::backdrop { background: rgba(0,0,0,.6); backdrop-filter: blur(4px); }
     }
 
     @layer components {
@@ -299,6 +303,7 @@
         font-size: 14px; font-weight: 600; transition: var(--transition); white-space: nowrap;
       }
       .btn-primary { background: linear-gradient(135deg, var(--accent), var(--cyan)); color: var(--surface-0); box-shadow: 0 2px 8px var(--accent-glow); }
+      [data-theme="light"] .btn-primary { color: #1e1e1a; } /* H4: dark text on gold bg for 4.5:1+ contrast */
       .btn-primary:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 4px 16px var(--accent-glow); }
       .btn-primary:active { transform: translateY(0); box-shadow: 0 1px 4px var(--accent-glow); }
       .btn-icon {
@@ -403,13 +408,6 @@
 
 
       /* Loading spinner */
-      dialog {
-        background: var(--surface-2); color: var(--text); border: var(--border-base);
-        border-radius: var(--radius); padding: 24px; max-width: 380px; width: 90vw;
-        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-        box-shadow: var(--shadow-lg);
-      }
-      dialog::backdrop { background: rgba(0,0,0,.6); backdrop-filter: blur(4px); }
 
       .spinner {
         width: 24px; height: 24px; border: 2px solid var(--border);
