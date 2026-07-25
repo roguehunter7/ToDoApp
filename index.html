@@ -662,7 +662,7 @@
             authSubmit.textContent = 'Sign Up';
             return;
           }
-          toast('Account created! You can now sign in.', 'added');
+          toast('Account created! Check your email to confirm (if required), then sign in.', 'added');
           // Switch to login
           isSignup = false;
           authToggleBtn.click();
@@ -767,7 +767,7 @@
     function classify(text) {
       const t = text.trim();
       const m = t.match(/^(did:|x:|\/done)\s*(.*)/i);
-      if (m) {
+      if (m && m[2]) {
         return { text: m[2] || m[0], entry_type: 'ACTIVITY_LOG', status: 'COMPLETED', completed_at: new Date().toISOString() };
       }
       return { text: t, entry_type: 'TODO', status: 'PENDING', scheduled_at: null, completed_at: null };
