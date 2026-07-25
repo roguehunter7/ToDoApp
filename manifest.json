@@ -4,7 +4,7 @@
   "start_url": "/ToDoApp/",
   "scope": "/ToDoApp/",
   "display": "standalone",
-  "theme_color": "#e8b44f",
+  "theme_color": "#141410",
   "background_color": "#141410",
   "description": "Minimal todo app with calendar scheduling",
   "icons": [
