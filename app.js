@@ -51,6 +51,7 @@
     let realtimeChannel = null;
     let loadSeq = 0;
     let activeTagFilter = null;
+    const pendingUndos = new Map();
 
     // Calendar state
     const today = () => {
@@ -367,7 +368,7 @@
       a.href = URL.createObjectURL(blob);
       a.download = `pulsetask-export-${today()}.json`;
       a.click();
-      URL.revokeObjectURL(a.href);
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       toast('Data exported', 'done');
     });
 
@@ -484,6 +485,7 @@
         .select('*')
         .eq('id', id).eq('user_id', currentUser.id)
         .maybeSingle();
+      if (!item) { toast('Task no longer exists', 'deleted'); return; }
 
       const { error } = await supabase
         .from('items')
@@ -491,17 +493,25 @@
         .eq('id', id).eq('user_id', currentUser.id);
       if (error) { console.error(error); toast(`Complete failed: ${error.message}`, 'deleted'); return; }
 
-      // Create next occurrence for recurring tasks
+      // Create next occurrence for recurring tasks (deduped)
       if (item?.recurrence) {
-        const nextDate = new Date();
-        if (item.recurrence === 'daily') nextDate.setDate(nextDate.getDate() + 1);
-        else if (item.recurrence === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
-        else if (item.recurrence === 'monthly') nextDate.setMonth(nextDate.getMonth() + 1);
-        await supabase.from('items').insert({
-          user_id: currentUser.id, text: item.text, entry_type: item.entry_type || 'TODO',
-          status: 'PENDING', tags: item.tags || [], recurrence: item.recurrence,
-          recurrence_origin_id: item.id, scheduled_at: nextDate.toISOString(),
-        });
+        const { data: existing } = await supabase
+          .from('items')
+          .select('id')
+          .eq('recurrence_origin_id', item.id)
+          .eq('status', 'PENDING')
+          .maybeSingle();
+        if (!existing) {
+          const nextDate = new Date();
+          if (item.recurrence === 'daily') nextDate.setDate(nextDate.getDate() + 1);
+          else if (item.recurrence === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
+          else if (item.recurrence === 'monthly') nextDate.setMonth(nextDate.getMonth() + 1);
+          await supabase.from('items').insert({
+            user_id: currentUser.id, text: item.text, entry_type: item.entry_type || 'TODO',
+            status: 'PENDING', tags: item.tags || [], recurrence: item.recurrence,
+            recurrence_origin_id: item.id, scheduled_at: nextDate.toISOString(),
+          });
+        }
       }
 
       toast('Task completed');
@@ -535,21 +545,22 @@
         `;
         // Undo-able complete
         div.querySelector('.item-check').addEventListener('change', function () {
-          if (!this.checked) return;
+          if (!this.checked || pendingUndos.has(item.id)) return;
           this.checked = false;
           const bar = document.createElement('div');
-          bar.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;box-shadow:var(--shadow-lg);animation:toast-in .45s cubic-bezier(.34,1.56,.64,1)';
-          bar.innerHTML = `<span>✅ Task done</span><button id="undoBtn" style="margin-left:auto;background:none;border:none;color:var(--accent);font-weight:700;font-size:13px;cursor:pointer;padding:4px 8px">Undo</button>`;
+          bar.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;box-shadow:var(--shadow-lg);animation:toast-in .45s cubic-bezier(.34,1.56,.64,1);pointer-events:auto';
+          bar.innerHTML = `<span>✅ Task done</span><button class="undo-btn" style="margin-left:auto;background:none;border:none;color:var(--accent);font-weight:700;font-size:13px;cursor:pointer;padding:4px 8px">Undo</button>`;
           toastContainer.appendChild(bar);
-          let done = false;
+          pendingUndos.set(item.id, true);
           const t = setTimeout(async () => {
-            if (done) return;
-            done = true; bar.remove();
+            pendingUndos.delete(item.id);
+            bar.remove();
             await completeItem(item.id);
           }, 5000);
-          bar.querySelector('#undoBtn').onclick = () => {
-            if (done) return;
-            done = true; clearTimeout(t); bar.remove();
+          bar.querySelector('.undo-btn').onclick = () => {
+            if (!pendingUndos.has(item.id)) return;
+            pendingUndos.delete(item.id);
+            clearTimeout(t); bar.remove();
           };
         });
         // Inline edit on double-click
@@ -632,6 +643,8 @@
         if (i.entry_type === 'TODO' && i.scheduled_at) taskDates.add(localDateFromISO(i.scheduled_at));
       });
 
+      const isToday = selectedDate === today();
+
       const done = filtered.filter(i =>
         i.status === 'COMPLETED' && i.completed_at &&
         +new Date(i.completed_at) >= selStartMs && +new Date(i.completed_at) <= selEndMs
@@ -648,7 +661,6 @@
       );
 
       // Update column titles
-      const isToday = selectedDate === today();
       doneColTitle.textContent = isToday ? 'What I Did Today' : `Done on ${fmtDateFull(selStart)}`;
       pendingColTitle.textContent = isToday ? 'Scheduled' : `Scheduled for ${fmtDateFull(selStart)}`;
 
@@ -722,9 +734,12 @@
           ? new Date(taskDate.value + 'T00:00:00').toISOString()
           : null;
         const item = classify(raw, scheduledAt);
-        const tags = tagsField.value.split(',').map(t => t.trim()).filter(Boolean);
-        const recurrence = recurrenceSelect.value || null;
-        const { error } = await supabase.from('items').insert({ ...item, user_id: currentUser.id, tags, recurrence });
+        const extras = {};
+        if (item.entry_type === 'TODO') {
+          extras.tags = tagsField.value.split(',').map(t => t.trim()).filter(Boolean);
+          extras.recurrence = recurrenceSelect.value || null;
+        }
+        const { error } = await supabase.from('items').insert({ ...item, user_id: currentUser.id, ...extras });
         if (error) {
           console.error(error);
           toast(`Error saving: ${error.message}`, 'deleted');

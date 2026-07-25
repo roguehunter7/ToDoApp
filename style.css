@@ -579,7 +579,6 @@
       }
       .chip:active { transform: scale(.96); }
 
-      .item-tags { display:flex;gap:3px;flex-wrap:wrap; }
       .tag-pill {
         display:inline-flex;padding:1px 6px;font-size:10px;font-weight:600;
         background:var(--accent-glow);color:var(--accent);border-radius:4px;
@@ -596,9 +595,19 @@
       .tag-filter.active { background:var(--accent-glow);border-color:var(--accent);color:var(--accent); }
 
       .input-extras { display:flex;flex-direction:column;gap:2px;margin-bottom:4px; }
+      #tagsField:focus { border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow); }
 
       select.date-input { appearance:auto;cursor:pointer; }
       select.date-input option { background:var(--surface-2);color:var(--text); }
+      .recurrence-input { max-width:100px;padding:14px 8px;font-size:12px; }
+      @media (width < 640px) { .recurrence-input { max-width:100%;width:100%;padding:12px; } }
+
+      .btn-text { background:none;border:none;cursor:pointer;transition:var(--transition); }
+      .btn-text:hover { color:var(--text); }
+
+      .tag-pill:focus-visible, .tag-filter:focus-visible { outline:2px solid var(--accent);outline-offset:2px; }
+
+      .item-tags { display:flex;gap:3px;flex-wrap:wrap;min-width:0; }
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
