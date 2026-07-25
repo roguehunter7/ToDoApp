@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PulseTask</title>
+  <script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2" crossorigin="anonymous"></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+  <div class="max-w-6xl mx-auto p-4 sm:p-6">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <h1 class="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">PulseTask</h1>
+      <p class="text-gray-500 mt-1 text-sm">Track what you do. Own your day.</p>
+    </div>
+
+    <!-- Unified Input -->
+    <div class="mb-8">
+      <div class="relative">
+        <input id="taskInput" type="text" placeholder='Type a task... or prefix with "did:", "x:", or "/done" to log an activity'
+               class="w-full px-4 py-3 pr-12 bg-gray-900 border border-gray-700 rounded-xl text-gray-100 placeholder-gray-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition">
+        <button id="addBtn" class="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition">
+          Add
+        </button>
+      </div>
+    </div>
+
+    <!-- Dashboard Columns -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Left: What I Did Today -->
+      <div>
+        <div class="flex items-center gap-2 mb-4">
+          <h2 class="text-lg font-semibold text-emerald-400">What I Did Today</h2>
+          <span id="doneCount" class="text-xs bg-emerald-900/50 text-emerald-300 px-2 py-0.5 rounded-full">0</span>
+        </div>
+        <div id="completedList" class="space-y-2">
+          <div class="text-center py-12 text-gray-600 text-sm">Nothing logged yet today</div>
+        </div>
+      </div>
+
+      <!-- Right: Left To Do -->
+      <div>
+        <div class="flex items-center gap-2 mb-4">
+          <h2 class="text-lg font-semibold text-cyan-400">Left To Do</h2>
+          <span id="pendingCount" class="text-xs bg-cyan-900/50 text-cyan-300 px-2 py-0.5 rounded-full">0</span>
+        </div>
+        <div id="pendingList" class="space-y-2">
+          <div class="text-center py-12 text-gray-600 text-sm">No pending tasks</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const supabase = window.supabase.createClient(
+      'https://rqhrsildsoxeadchozui.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxaHJzaWxkc294ZWFkY2hvenVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5NzEwODUsImV4cCI6MjEwMDU0NzA4NX0.SyzfABMYO2APB-zpZp3FYHv2kKLOXEiUjIdlP3V3VzU'
+    );
+
+    const taskInput = document.getElementById('taskInput');
+    const addBtn = document.getElementById('addBtn');
+    const completedList = document.getElementById('completedList');
+    const pendingList = document.getElementById('pendingList');
+    const doneCount = document.getElementById('doneCount');
+    const pendingCount = document.getElementById('pendingCount');
+
+    function classifyInput(text) {
+      const trimmed = text.trim();
+      const isActivity = /^(did:|x:|\/done)\s*/i.test(trimmed);
+      const cleanText = trimmed.replace(/^(did:|x:|\/done)\s*/i, '');
+      if (isActivity) {
+        return { text: cleanText, entry_type: 'ACTIVITY_LOG', status: 'COMPLETED', completed_at: new Date().toISOString() };
+      }
+      return { text: cleanText, entry_type: 'TODO', status: 'PENDING', scheduled_at: null };
+    }
+
+    function renderItem(item) {
+      const div = document.createElement('div');
+      div.className = 'flex items-center gap-3 px-4 py-3 bg-gray-900 border border-gray-800 rounded-lg hover:border-gray-700 transition group';
+      div.dataset.id = item.id;
+
+      if (item.entry_type === 'TODO' && item.status === 'PENDING') {
+        div.innerHTML = `
+          <input type="checkbox" class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-emerald-500 focus:ring-emerald-500 cursor-pointer flex-shrink-0">
+          <span class="flex-1 text-sm">${escapeHtml(item.text)}</span>
+          <span class="text-xs text-gray-600 opacity-0 group-hover:opacity-100 transition">pending</span>
+        `;
+        const cb = div.querySelector('input');
+        cb.addEventListener('change', () => completeItem(item.id));
+      } else {
+        div.innerHTML = `
+          <span class="text-emerald-500 flex-shrink-0">✅</span>
+          <div class="flex-1 min-w-0">
+            <span class="text-sm text-gray-300">${escapeHtml(item.text)}</span>
+            <span class="text-xs text-gray-600 ml-2">${formatTime(item.completed_at)}</span>
+          </div>
+        `;
+      }
+      return div;
+    }
+
+    function escapeHtml(text) {
+      const d = document.createElement('div');
+      d.textContent = text;
+      return d.innerHTML;
+    }
+
+    function formatTime(ts) {
+      if (!ts) return '';
+      const d = new Date(ts);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    async function completeItem(id) {
+      await supabase
+        .from('items')
+        .update({ status: 'COMPLETED', completed_at: new Date().toISOString() })
+        .eq('id', id);
+      loadItems();
+    }
+
+    async function loadItems() {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const { data, error } = await supabase
+        .from('items')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) { console.error(error); return; }
+
+      const todayStr = todayStart.toISOString();
+      const completed = (data || []).filter(i =>
+        i.status === 'COMPLETED' && i.completed_at && i.completed_at >= todayStr
+      );
+      const pending = (data || []).filter(i =>
+        i.entry_type === 'TODO' && i.status === 'PENDING'
+      );
+
+      // Render completed
+      if (completed.length === 0) {
+        completedList.innerHTML = '<div class="text-center py-12 text-gray-600 text-sm">Nothing logged yet today</div>';
+      } else {
+        completedList.innerHTML = '';
+        completed.sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
+        completed.forEach(item => completedList.appendChild(renderItem(item)));
+      }
+
+      // Render pending
+      if (pending.length === 0) {
+        pendingList.innerHTML = '<div class="text-center py-12 text-gray-600 text-sm">No pending tasks</div>';
+      } else {
+        pendingList.innerHTML = '';
+        pending.forEach(item => pendingList.appendChild(renderItem(item)));
+      }
+
+      doneCount.textContent = completed.length;
+      pendingCount.textContent = pending.length;
+    }
+
+    async function addItem() {
+      const raw = taskInput.value.trim();
+      if (!raw) return;
+
+      const item = classifyInput(raw);
+      const { error } = await supabase.from('items').insert(item);
+      if (error) {
+        console.error(error);
+        return;
+      }
+      taskInput.value = '';
+      taskInput.focus();
+      loadItems();
+    }
+
+    addBtn.addEventListener('click', addItem);
+    taskInput.addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
+
+    // Real-time subscription
+    supabase
+      .channel('items-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, loadItems)
+      .subscribe();
+
+    loadItems();
+  </script>
+</body>
+</html>
