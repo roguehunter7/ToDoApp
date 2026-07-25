@@ -1,0 +1,28 @@
+name: Supabase Security Advisor
+
+on:
+  schedule:
+    - cron: '15 7 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Supabase Advisors
+        env:
+          SUPABASE_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: rqhrsildsoxeadchozui
+        run: |
+          for category in security performance; do
+            echo "━━━ $category ━━━"
+            response=$(curl -sf -H "Authorization: Bearer $SUPABASE_TOKEN" \
+              "https://api.supabase.com/v1/projects/$PROJECT_REF/advisors/$category") || {
+              echo "⚠  No response (SUPABASE_ACCESS_TOKEN not set)"
+              echo "   Set it in GitHub repo secrets to enable this check"
+              continue
+            }
+            echo "$response" | jq -r '
+              .lints[] | "\(if .level == "WARN" then "⚠" else "ℹ" end) \(.title)\n  \(.detail)\n  → \(.remediation)"' 2>/dev/null || echo "✓ No advisories"
+            echo ""
+          done
