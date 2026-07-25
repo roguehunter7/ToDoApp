@@ -1,107 +1,62 @@
 # PulseTask
 
-Minimal todo + activity tracker with auth, calendar scheduling, and AI-powered summaries, built on Supabase.
+Todo + activity tracker with auth, calendar scheduling, and AI summaries. Vanilla JS, zero build step.
 
 **Live:** https://roguehunter7.github.io/ToDoApp/
 
 ## Stack
 
-- Vanilla JS (ES module, no framework, no build step)
-- Supabase (Auth, Postgres + RLS, Realtime, Edge Functions)
-- GitHub Pages (deploy on push to `main`)
-- PWA (service worker caches app shell, installable)
+- **Vanilla JS** — ES modules, no framework, no build
+- **Supabase** — Auth, Postgres with RLS, Realtime, Edge Functions
+- **GitHub Pages** — auto-deployed on push to `main`
+- **PWA** — installable, cached app shell
 
 ## Features
 
-### Auth
-- Sign up / sign in with email + password
-- Persistent session across tabs
-- Account self-deletion (Edge Function + RPC fallback)
-
-### Tasks & Activities
-- **Task mode** (📝) — add todos with optional scheduled date
-- **Activity mode** (✨) — log things you did (marked complete immediately)
-- Quick-add chips for common tasks (hide after first use)
-- Keyboard: `⌘K` / `Ctrl+K` to focus input, `Enter` to add, `Escape` to jump to today
-
-### Dashboard
-- Two-column layout: completed / pending
-- Per-day view: select a day from the week strip or date picker
-- Progress ring showing completion percentage
-- Stats badges: done today / left to do
-- Relative timestamps on completed items
-
-### Calendar
-- Week strip with dots on days that have tasks
-- Navigate weeks with `‹` / `›` arrows
-- Date picker to jump to any date
-- Escape returns to today's view
-
-### AI Summaries (optional)
-- Generate daily / weekly / monthly reports
-- Edge Function calls DeepSeek to produce summaries and bullet points
-- Previously generated reports are browsable from the report dialog
-
-### Real-time sync
-- Tasks update across open tabs instantly via Supabase Realtime
-- Filtered to the current user (admin sees all)
-
-### PWA
-- Installable on desktop and mobile
-- Offline-capable (service worker caches app shell)
-- Manifest includes theme color, display mode metadata
+- Sign up / sign in with email + password, account self-delete
+- **Task mode** — add todos with optional scheduled date
+- **Activity mode** — log things you did (auto-completed)
+- Two-column dashboard (done / pending) per selected day
+- Week strip calendar with task dots, date picker, `Escape` resets to today
+- Progress ring with completion %, stats badges
+- Real-time sync across open tabs
+- **AI Summaries** — daily / weekly / monthly reports via DeepSeek v4 Flash (Edge Function)
+- `⌘K` focus input, `Enter` add, quick-add chips (hide after first use)
 
 ## Database
 
 | Table | Purpose |
 |-------|---------|
-| `items` | Todos (`TODO`) and activity logs (`ACTIVITY_LOG`), owned by user |
-| `admins` | Email-based admin list (admin sees all items) |
-| `reports` | Generated report summaries, owned by user |
+| `items` | Todos (`TODO`) and activity logs (`ACTIVITY_LOG`) |
+| `admins` | Email-based admin list |
+| `reports` | Generated AI summaries |
 
-### Row-Level Security
-- **items:** users CRUD own items; admins SELECT all
-- **admins:** any authenticated user can read (for admin check)
-- **reports:** users SELECT own reports; edge function inserts via service role
+RLS: users CRUD own items; admins SELECT all; reports insert via service role.
 
 ## Project structure
 
 ```
-├── index.html       App shell (auth UI, main layout, dialogs)
-├── style.css        All styles (layered: reset → theme → base → components)
-├── app.js           Application logic (auth, CRUD, calendar, reports)
-├── sw.js            Service worker (stale-while-revalidate with network timeout)
-├── manifest.json    PWA manifest
-├── favicon.svg      SVG favicon + PWA icon
+├── index.html     App shell + dialogs
+├── style.css      Layered CSS (reset → theme → base → components)
+├── app.js         All app logic
+├── sw.js          Service worker
+├── manifest.json  PWA manifest
+├── favicon.svg    SVG icon
 └── README.md
 ```
 
-## Local development
-
-Serve the project root with any static server — no build step needed.
+## Local dev
 
 ```sh
-# Python
-python3 -m http.server 8080
-
-# Node (npx)
-npx serve .
+python3 -m http.server 8080   # or: npx serve .
 ```
 
-The app connects to a Supabase project directly from the client. The anon key and project URL are embedded in `app.js`.
+To run your own instance: create a Supabase project, create the tables, set up RLS, deploy the `delete-account` and `generate-summary` edge functions, then swap the `supabase.createClient()` URL and anon key in `app.js`.
 
-To run your own instance:
-1. Create a Supabase project
-2. Create the `items`, `admins`, and `reports` tables matching the schema
-3. Set up RLS policies
-4. Deploy the `delete-account` and `generate-summary` edge functions
-5. Update the `supabase.createClient()` call in `app.js` with your project URL and anon key
-
-## Keyboard shortcuts
+## Keyboard
 
 | Key | Action |
 |-----|--------|
-| `Enter` | Add task / activity |
+| `Enter` | Add task/activity |
 | `⌘K` / `Ctrl+K` | Focus input |
-| `Escape` | Reset view to today |
-| `Escape` (dialog open) | Close dialog |
+| `Escape` | Reset to today / close dialog |
